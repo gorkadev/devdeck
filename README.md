@@ -57,6 +57,13 @@ any of them drifts:
 | `base: "/devdeck/"` | `vite.config.ts` | Assets are requested from `/assets/…`, fall outside the route, and the landing page answers instead |
 | `outDir: "dist/devdeck"` | `vite.config.ts` | The built files no longer mirror the URL path |
 | `basepath: "/devdeck"` | `createRouter` in `src/main.tsx` | Every internal link points outside the app |
+| `cp dist/devdeck/index.html dist/index.html` | the `build` script | Deep links such as `/devdeck/jwt-decoder` return 404 |
+
+That last one is not a workaround for a bug, it is how Workers static assets
+work: the `single-page-application` fallback always serves `/index.html` from
+the root of the assets directory, never the nearest one. Since the build lives
+in `dist/devdeck/`, the root needs its own copy of the shell. The copy still
+references `/devdeck/assets/…` in absolute terms, so it boots correctly.
 
 ## Architecture
 
