@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gorkadev-devdeck",
+  "compatibility_date": "2026-08-26",
+  "assets": {
+    // `dist/` holds a single `devdeck/` folder, so /devdeck/… maps onto it.
+    "directory": "./dist",
+    // Client-side routing: unknown paths fall back to the app shell.
+    "not_found_handling": "single-page-application"
+  },
+  // A path route, not a custom domain: gorkadev.com itself belongs to the
+  // landing Worker, and routes are evaluated before it.
+  "routes": [
+    {
+      "pattern": "gorkadev.com/devdeck*",
+      "zone_name": "gorkadev.com"
+    }
+  ]
+}

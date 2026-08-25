@@ -8,8 +8,9 @@ import { ThemeProvider } from "@/components/theme-provider.tsx"
 // Import the generated route tree
 import { routeTree } from "./routeTree.gen"
 
-// Create a new router instance
-const router = createRouter({ routeTree })
+// Create a new router instance. `basepath` must match the Vite base: the router
+// owns the URLs, so without it every internal link would point outside /devdeck.
+const router = createRouter({ routeTree, basepath: "/devdeck" })
 
 // Register the router instance for type safety
 declare module "@tanstack/react-router" {
