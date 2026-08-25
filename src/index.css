@@ -1,4 +1,12 @@
 @import "tailwindcss";
+
+/* Cross-document view transitions: the landing, /cv and /devdeck are separate
+ * documents, so navigating between them is a real page load. This only lets the
+ * browser cross-fade instead of flashing. Unsupported browsers ignore it. */
+@view-transition {
+  navigation: auto;
+}
+
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/inter";
