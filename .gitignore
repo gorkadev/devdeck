@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Vendored agent skills — tracked through skills-lock.json, not committed
+.agents/skills/
+.claude/skills/
+
+# Local scratch workspace
+scratch/
