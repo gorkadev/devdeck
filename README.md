@@ -1,5 +1,7 @@
 # devdeck
 
+**Live at [gorkadev.com/devdeck](https://gorkadev.com/devdeck)**
+
 The developer tools you keep googling, in one place. Everything runs in the
 browser — nothing you paste ever leaves your machine.
 
@@ -36,6 +38,25 @@ pnpm dev
 
 `pnpm build` type-checks and bundles. `pnpm typecheck`, `pnpm lint` and
 `pnpm format` do what they say.
+
+## Deploying
+
+Pushing to `main` builds and deploys through GitHub Actions. To deploy by hand:
+
+```bash
+pnpm cf:deploy
+```
+
+The app is served by its own Cloudflare Worker on the route
+`gorkadev.com/devdeck*`, separate from the Worker that owns the apex. Three
+things have to agree on that prefix, and the app breaks in a different way if
+any of them drifts:
+
+| Setting | Where | If it is wrong |
+|---------|-------|----------------|
+| `base: "/devdeck/"` | `vite.config.ts` | Assets are requested from `/assets/…`, fall outside the route, and the landing page answers instead |
+| `outDir: "dist/devdeck"` | `vite.config.ts` | The built files no longer mirror the URL path |
+| `basepath: "/devdeck"` | `createRouter` in `src/main.tsx` | Every internal link points outside the app |
 
 ## Architecture
 
