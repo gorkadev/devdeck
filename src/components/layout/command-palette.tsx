@@ -1,5 +1,4 @@
 import * as React from "react"
-import { Braces, Hash, ShieldCheck, Fingerprint, LockKeyhole, Binary, CalendarClock } from "lucide-react"
 import { useNavigate } from "@tanstack/react-router"
 
 import {
@@ -11,6 +10,7 @@ import {
   CommandList,
   Command,
 } from "@/components/ui/command"
+import { TOOLS } from "@/lib/tools"
 
 export function CommandPalette() {
   const [open, setOpen] = React.useState(false)
@@ -39,48 +39,15 @@ export function CommandPalette() {
         <CommandList>
           <CommandEmpty>No se han encontrado resultados.</CommandEmpty>
           <CommandGroup heading="Herramientas">
-            <CommandItem
-              onSelect={() => runCommand(() => navigate({ to: "/json-formatter" }))}
-            >
-              <Braces className="mr-2 h-4 w-4" />
-              <span>JSON Formatter</span>
-            </CommandItem>
-            <CommandItem
-              onSelect={() => runCommand(() => navigate({ to: "/jwt-decoder" }))}
-            >
-              <ShieldCheck className="mr-2 h-4 w-4" />
-              <span>JWT Decoder</span>
-            </CommandItem>
-            <CommandItem
-              onSelect={() => runCommand(() => navigate({ to: "/uuid-generator" }))}
-            >
-              <Hash className="mr-2 h-4 w-4" />
-              <span>UUID Generator</span>
-            </CommandItem>
-            <CommandItem
-              onSelect={() => runCommand(() => navigate({ to: "/hash-generator" }))}
-            >
-              <Fingerprint className="mr-2 h-4 w-4" />
-              <span>Hash Generator</span>
-            </CommandItem>
-            <CommandItem
-              onSelect={() => runCommand(() => navigate({ to: "/bcrypt-generator" }))}
-            >
-              <LockKeyhole className="mr-2 h-4 w-4" />
-              <span>Bcrypt Generator</span>
-            </CommandItem>
-            <CommandItem
-              onSelect={() => runCommand(() => navigate({ to: "/base64-converter" }))}
-            >
-              <Binary className="mr-2 h-4 w-4" />
-              <span>Base64 Converter</span>
-            </CommandItem>
-            <CommandItem
-              onSelect={() => runCommand(() => navigate({ to: "/cron-parser" }))}
-            >
-              <CalendarClock className="mr-2 h-4 w-4" />
-              <span>Cron Parser</span>
-            </CommandItem>
+            {TOOLS.map((tool) => (
+              <CommandItem
+                key={tool.url}
+                onSelect={() => runCommand(() => navigate({ to: tool.url }))}
+              >
+                <tool.icon className="mr-2 h-4 w-4" />
+                <span>{tool.title}</span>
+              </CommandItem>
+            ))}
           </CommandGroup>
         </CommandList>
       </Command>

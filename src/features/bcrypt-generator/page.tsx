@@ -38,43 +38,52 @@ export function BcryptGeneratorPage() {
   const [isVerifying, setIsVerifying] = React.useState(false)
   const [verifyResult, setVerifyResult] = React.useState<"success" | "error" | null>(null)
 
-  const handleGenerate = () => {
+  // bcrypt async chunks work between event-loop turns; guards drop stale
+  // completions when the user edits the inputs mid-run.
+  const generateRun = React.useRef(0)
+  const verifyRun = React.useRef(0)
+
+  const handleGenerate = async () => {
     if (!genText) return
+    const run = ++generateRun.current
     setIsGenerating(true)
     setGeneratedHash("")
 
-    // Defer the work slightly so React can paint the loading state
-    setTimeout(() => {
-      try {
-        const hash = bcrypt.hashSync(genText, rounds)
+    try {
+      const hash = await bcrypt.hash(genText, rounds)
+      if (run === generateRun.current) {
         setGeneratedHash(hash)
         setGeneratedCost(rounds)
-      } catch (err) {
+      }
+    } catch (err) {
+      if (run === generateRun.current) {
         console.error(err)
         toast.add({ type: "error", title: "Error", description: "Fallo al generar el hash." })
-      } finally {
-        setIsGenerating(false)
       }
-    }, 50)
+    } finally {
+      if (run === generateRun.current) setIsGenerating(false)
+    }
   }
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
     if (!verHash || !verText) return
+    const run = ++verifyRun.current
     setIsVerifying(true)
     setVerifyResult(null)
 
-    // Defer the work slightly so React can paint the loading state
-    setTimeout(() => {
-      try {
-        const matches = bcrypt.compareSync(verText, verHash)
+    try {
+      const matches = await bcrypt.compare(verText, verHash)
+      if (run === verifyRun.current) {
         setVerifyResult(matches ? "success" : "error")
-      } catch (err) {
+      }
+    } catch (err) {
+      if (run === verifyRun.current) {
         console.error(err)
         setVerifyResult("error")
-      } finally {
-        setIsVerifying(false)
       }
-    }, 50)
+    } finally {
+      if (run === verifyRun.current) setIsVerifying(false)
+    }
   }
 
   const copyToClipboard = async () => {

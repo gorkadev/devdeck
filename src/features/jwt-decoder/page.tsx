@@ -1,6 +1,6 @@
 import * as React from "react"
 import { ShieldAlertIcon, ShieldCheckIcon, CopyIcon, TrashIcon, TerminalIcon } from "lucide-react"
-import { jwtVerify, decodeJwt, decodeProtectedHeader, SignJWT } from "jose"
+import { jwtVerify, decodeJwt, decodeProtectedHeader, SignJWT, base64url } from "jose"
 import { toast } from "@/components/ui/toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card"
@@ -12,8 +12,9 @@ import { Switch } from "@/components/ui/switch"
 import { CodeEditor } from "@/components/shared/code-editor"
 import { jwtHighlightPlugin } from "@/components/shared/jwt-highlight-plugin"
 
-// Token de ejemplo por defecto
-const DEFAULT_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+// Token de ejemplo por defecto (firmado con "your-256-bit-secret" para que la
+// verificación de firma funcione al cargar la página)
+const DEFAULT_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.reGQzG3OKdoIMWLDKOZ4TICJit3EW69cQE72E2CfzRE"
 
 export function JwtDecoderPage() {
   const [token, setToken] = React.useState(DEFAULT_TOKEN)
@@ -74,14 +75,9 @@ export function JwtDecoderPage() {
 
     const verify = async () => {
       try {
-        let secretKey: Uint8Array
-        if (isBase64Url) {
-          // Si está en base64url, usamos TextEncoder, o podríamos usar base64url-decode
-          // Para simplificar, asumimos Uint8Array simple (en un entorno real usaríamos una decodificación de B64)
-          secretKey = new TextEncoder().encode(secret)
-        } else {
-          secretKey = new TextEncoder().encode(secret)
-        }
+        const secretKey = isBase64Url
+          ? base64url.decode(secret)
+          : new TextEncoder().encode(secret)
 
         await jwtVerify(token, secretKey)
         setIsValidSignature(true)
@@ -122,7 +118,9 @@ export function JwtDecoderPage() {
     if (parsedHeader && parsedPayload) {
       const sign = async () => {
         try {
-          const secretKey = new TextEncoder().encode(encoderSecret)
+          const secretKey = isEncoderBase64Url
+            ? base64url.decode(encoderSecret)
+            : new TextEncoder().encode(encoderSecret)
           const token = await new SignJWT(parsedPayload)
             .setProtectedHeader(parsedHeader as { alg: string; [key: string]: unknown })
             .sign(secretKey)
@@ -362,7 +360,7 @@ export function JwtDecoderPage() {
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold">Verify Signature</h2>
+                    <h2 className="text-lg font-semibold">Signing Secret</h2>
                     <p className="text-xs text-muted-foreground">Enter the secret used to sign the JWT below:</p>
                   </div>
                   <div className="flex items-center gap-2">
