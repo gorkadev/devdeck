@@ -1,5 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { TOOLS } from "@/lib/tools"
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 
 export const Route = createFileRoute('/')({
   component: Index,
@@ -17,17 +23,21 @@ function Index() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {TOOLS.map((tool) => (
-          <Link
+          <Card
             key={tool.url}
-            to={tool.url}
-            className="group flex flex-col gap-3 rounded-xl border bg-card p-5 shadow-sm transition-colors hover:bg-accent hover:border-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="transition-colors hover:bg-accent hover:ring-foreground/20 focus-within:ring-2 focus-within:ring-ring"
           >
-            <tool.icon className="size-5 text-muted-foreground transition-colors group-hover:text-foreground" />
-            <div className="flex flex-col gap-1">
-              <span className="font-semibold">{tool.title}</span>
-              <span className="text-sm text-muted-foreground">{tool.description}</span>
-            </div>
-          </Link>
+            <Link
+              to={tool.url}
+              className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <CardHeader>
+                <tool.icon className="size-5 text-muted-foreground transition-colors group-hover/card:text-foreground" />
+                <CardTitle>{tool.title}</CardTitle>
+                <CardDescription>{tool.description}</CardDescription>
+              </CardHeader>
+            </Link>
+          </Card>
         ))}
       </div>
     </div>
