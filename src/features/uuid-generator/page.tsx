@@ -33,7 +33,7 @@ export function UuidGeneratorPage() {
   const [hyphens, setHyphens] = React.useState(true)
   const [uppercase, setUppercase] = React.useState(false)
   const [quoteType, setQuoteType] = React.useState<QuoteType>("none")
-  const [results, setResults] = React.useState("")
+  const [rawUuids, setRawUuids] = React.useState<string[]>([])
 
   const selectedVersionLabel = VERSION_OPTIONS.find((v) => v.value === version)
   const selectedQuoteLabel = QUOTE_OPTIONS.find((q) => q.value === quoteType)
@@ -43,26 +43,32 @@ export function UuidGeneratorPage() {
     const newUuids: string[] = []
 
     for (let i = 0; i < num; i++) {
-      let id = ""
-      if (version === "v1") id = uuidv1()
-      else if (version === "v4") id = uuidv4()
-      else if (version === "v6") id = uuidv6()
-      else if (version === "v7") id = uuidv7()
-
-      if (!hyphens) id = id.replace(/-/g, "")
-      if (uppercase) id = id.toUpperCase()
-      if (quoteType === "single") id = `'${id}'`
-      else if (quoteType === "double") id = `"${id}"`
-
-      newUuids.push(id)
+      if (version === "v1") newUuids.push(uuidv1())
+      else if (version === "v4") newUuids.push(uuidv4())
+      else if (version === "v6") newUuids.push(uuidv6())
+      else if (version === "v7") newUuids.push(uuidv7())
     }
 
-    setResults(newUuids.join("\n"))
-  }, [version, quantity, hyphens, uppercase, quoteType])
+    setRawUuids(newUuids)
+  }, [version, quantity])
 
   React.useEffect(() => {
     generateUuids()
   }, [generateUuids])
+
+  // Formatting toggles re-shape the already generated UUIDs instead of
+  // generating new ones, so they only re-render the derived output.
+  const results = React.useMemo(() => {
+    return rawUuids
+      .map((id) => {
+        let formatted = hyphens ? id : id.replace(/-/g, "")
+        if (uppercase) formatted = formatted.toUpperCase()
+        if (quoteType === "single") formatted = `'${formatted}'`
+        else if (quoteType === "double") formatted = `"${formatted}"`
+        return formatted
+      })
+      .join("\n")
+  }, [rawUuids, hyphens, uppercase, quoteType])
 
   const copyToClipboard = React.useCallback(async () => {
     if (!results) return
