@@ -1,7 +1,6 @@
 import * as React from "react"
 import { v1 as uuidv1, v4 as uuidv4, v6 as uuidv6, v7 as uuidv7 } from "uuid"
 import { CopyIcon, RefreshCwIcon } from "lucide-react"
-import { toast } from "@/components/ui/toast"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -10,6 +9,7 @@ import { Select, SelectTrigger, SelectContent, SelectGroup, SelectItem } from "@
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import { useCopy } from "@/hooks/use-copy"
 
 type UuidVersion = "v1" | "v4" | "v6" | "v7"
 type QuoteType = "none" | "single" | "double"
@@ -28,6 +28,7 @@ const QUOTE_OPTIONS: { value: QuoteType; label: string }[] = [
 ]
 
 export function UuidGeneratorPage() {
+  const copy = useCopy()
   const [version, setVersion] = React.useState<UuidVersion>("v4")
   const [quantity, setQuantity] = React.useState("1")
   const [hyphens, setHyphens] = React.useState(true)
@@ -70,16 +71,6 @@ export function UuidGeneratorPage() {
       .join("\n")
   }, [rawUuids, hyphens, uppercase, quoteType])
 
-  const copyToClipboard = React.useCallback(async () => {
-    if (!results) return
-    await navigator.clipboard.writeText(results)
-    toast.add({
-      type: "success",
-      title: "Copiado",
-      description: "UUID(s) copiados al portapapeles.",
-    })
-  }, [results])
-
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="flex flex-col gap-1">
@@ -109,7 +100,7 @@ export function UuidGeneratorPage() {
                 <RefreshCwIcon data-icon="inline-start" />
                 Generar
               </Button>
-              <Button onClick={copyToClipboard} variant="secondary" className="flex-1">
+              <Button onClick={() => copy(results, "UUID(s) copiados al portapapeles.")} variant="secondary" className="flex-1">
                 <CopyIcon data-icon="inline-start" />
                 Copiar
               </Button>

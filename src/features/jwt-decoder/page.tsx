@@ -1,7 +1,6 @@
 import * as React from "react"
 import { ShieldAlertIcon, ShieldCheckIcon, CopyIcon, TrashIcon, TerminalIcon } from "lucide-react"
 import { jwtVerify, decodeJwt, decodeProtectedHeader, SignJWT, base64url } from "jose"
-import { toast } from "@/components/ui/toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -11,12 +10,14 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { CodeEditor } from "@/components/shared/code-editor"
 import { jwtHighlightPlugin } from "@/components/shared/jwt-highlight-plugin"
+import { useCopy } from "@/hooks/use-copy"
 
 // Token de ejemplo por defecto (firmado con "your-256-bit-secret" para que la
 // verificación de firma funcione al cargar la página)
 const DEFAULT_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.reGQzG3OKdoIMWLDKOZ4TICJit3EW69cQE72E2CfzRE"
 
 export function JwtDecoderPage() {
+  const copy = useCopy()
   const [token, setToken] = React.useState(DEFAULT_TOKEN)
   const [secret, setSecret] = React.useState("")
   const [isBase64Url, setIsBase64Url] = React.useState(false)
@@ -89,10 +90,7 @@ export function JwtDecoderPage() {
     verify()
   }, [token, secret, parseError, isBase64Url])
 
-  const copyToClipboard = (text: string, label: string) => {
-    navigator.clipboard.writeText(text)
-    toast.add({ type: "success", title: "Copiado", description: `${label} copiado.` })
-  }
+  const copyToken = (text: string) => copy(text, "Token copiado al portapapeles.")
 
   // Encode effect
   React.useEffect(() => {
@@ -163,7 +161,7 @@ export function JwtDecoderPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Tooltip>
-                      <TooltipTrigger render={<Button variant="ghost" size="icon-sm" onClick={() => copyToClipboard(token, 'Token')}><CopyIcon /></Button>} />
+                      <TooltipTrigger render={<Button variant="ghost" size="icon-sm" onClick={() => copyToken(token)}><CopyIcon /></Button>} />
                       <TooltipContent>Copy Token</TooltipContent>
                     </Tooltip>
                     <Tooltip>
@@ -399,7 +397,7 @@ export function JwtDecoderPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Tooltip>
-                      <TooltipTrigger render={<Button variant="ghost" size="icon-sm" onClick={() => copyToClipboard(generatedToken, 'Token')}><CopyIcon /></Button>} />
+                      <TooltipTrigger render={<Button variant="ghost" size="icon-sm" onClick={() => copyToken(generatedToken)}><CopyIcon /></Button>} />
                       <TooltipContent>Copy Token</TooltipContent>
                     </Tooltip>
                   </div>

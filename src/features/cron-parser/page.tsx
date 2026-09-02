@@ -2,13 +2,13 @@ import * as React from "react"
 import { CopyIcon } from "lucide-react"
 import cronstrue from "cronstrue/i18n"
 import { CronExpressionParser } from "cron-parser"
-import { toast } from "@/components/ui/toast"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useCopy } from "@/hooks/use-copy"
 
 const PRESETS = [
   { label: "* * * * *", desc: "Cada minuto" },
@@ -20,6 +20,7 @@ const PRESETS = [
 ]
 
 export function CronParserPage() {
+  const copy = useCopy()
   const [expression, setExpression] = React.useState("*/15 * * * *")
   const [iterations, setIterations] = React.useState<number>(5)
 
@@ -49,12 +50,6 @@ export function CronParserPage() {
       return { humanReadable: "Expresión inválida o incompleta.", nextDates: [], isValid: false }
     }
   }, [expression, iterations])
-
-  const copyToClipboard = async () => {
-    if (!expression) return
-    await navigator.clipboard.writeText(expression)
-    toast.add({ type: "success", title: "Copiado", description: "Expresión Cron copiada." })
-  }
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -89,7 +84,7 @@ export function CronParserPage() {
       <Card>
         <CardHeader className="flex flex-row justify-between items-center">
           <CardTitle>Expresión Cron</CardTitle>
-          <Button variant="ghost" size="icon-sm" onClick={copyToClipboard} title="Copiar expresión">
+          <Button variant="ghost" size="icon-sm" onClick={() => copy(expression, "Expresión Cron copiada.")} title="Copiar expresión">
             <CopyIcon />
           </Button>
         </CardHeader>
