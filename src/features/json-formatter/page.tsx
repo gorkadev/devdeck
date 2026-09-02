@@ -39,15 +39,15 @@ export function JsonFormatterPage() {
   return (
     <div className="flex h-[calc(100vh-6rem)] flex-col gap-4">
       {/* Header and Toolbar */}
-      <div className="flex items-end justify-between">
-        <div className="flex flex-col gap-1">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex min-w-0 flex-col gap-1">
           <h1 className="text-3xl font-bold tracking-tight">JSON Formatter</h1>
           <p className="text-muted-foreground text-sm">
             Formatea y valida tu código JSON en tiempo real.
           </p>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground font-medium">Indentación:</span>
             <ToggleGroup
