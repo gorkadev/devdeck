@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router"
-import { Code, Hash, Braces, ShieldCheck, Fingerprint, LockKeyhole, Binary, CalendarClock } from "lucide-react"
+import { Code } from "lucide-react"
 
 import {
   Sidebar,
@@ -12,44 +12,7 @@ import {
   SidebarMenuItem,
   SidebarHeader,
 } from "@/components/ui/sidebar"
-
-const tools = [
-  {
-    title: "JSON Formatter",
-    url: "/json-formatter" as const,
-    icon: Braces,
-  },
-  {
-    title: "JWT Decoder",
-    url: "/jwt-decoder" as const,
-    icon: ShieldCheck,
-  },
-  {
-    title: "UUID Generator",
-    url: "/uuid-generator" as const,
-    icon: Hash,
-  },
-  {
-    title: "Hash Generator",
-    url: "/hash-generator" as const,
-    icon: Fingerprint,
-  },
-  {
-    title: "Bcrypt Generator",
-    url: "/bcrypt-generator" as const,
-    icon: LockKeyhole,
-  },
-  {
-    title: "Base64 Converter",
-    url: "/base64-converter" as const,
-    icon: Binary,
-  },
-  {
-    title: "Cron Parser",
-    url: "/cron-parser" as const,
-    icon: CalendarClock,
-  },
-]
+import { TOOLS } from "@/lib/tools"
 
 export function AppSidebar() {
   return (
@@ -65,11 +28,9 @@ export function AppSidebar() {
           <SidebarGroupLabel>Herramientas</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {tools.map((tool) => (
-                <SidebarMenuItem key={tool.title}>
-                  <SidebarMenuButton 
-                    render={<Link to={tool.url} />}
-                  >
+              {TOOLS.map((tool) => (
+                <SidebarMenuItem key={tool.url}>
+                  <SidebarMenuButton render={<Link to={tool.url} />}>
                     <tool.icon />
                     <span>{tool.title}</span>
                   </SidebarMenuButton>
