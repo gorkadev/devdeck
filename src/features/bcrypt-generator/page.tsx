@@ -9,6 +9,7 @@ import { FieldGroup, Field, FieldLabel, FieldDescription } from "@/components/ui
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Slider } from "@/components/ui/slider"
+import { useCopy } from "@/hooks/use-copy"
 
 // Helper para obtener el texto dinámico y color según rondas
 function getSecurityInfo(rounds: number) {
@@ -25,6 +26,8 @@ function getSecurityInfo(rounds: number) {
 }
 
 export function BcryptGeneratorPage() {
+  const copy = useCopy()
+
   // Generation State
   const [genText, setGenText] = React.useState("")
   const [rounds, setRounds] = React.useState(10) // Slider value is an array
@@ -84,12 +87,6 @@ export function BcryptGeneratorPage() {
     } finally {
       if (run === verifyRun.current) setIsVerifying(false)
     }
-  }
-
-  const copyToClipboard = async () => {
-    if (!generatedHash) return
-    await navigator.clipboard.writeText(generatedHash)
-    toast.add({ type: "success", title: "Copiado", description: "Hash bcrypt copiado al portapapeles." })
   }
 
   const secInfo = getSecurityInfo(rounds)
@@ -154,7 +151,7 @@ export function BcryptGeneratorPage() {
                   <div className="font-mono text-sm break-all flex-1 select-all pt-1">
                     {generatedHash}
                   </div>
-                  <Button variant="secondary" size="icon-sm" onClick={copyToClipboard} className="shrink-0">
+                  <Button variant="secondary" size="icon-sm" onClick={() => copy(generatedHash, "Hash bcrypt copiado al portapapeles.")} className="shrink-0">
                     <CopyIcon className="size-4" />
                   </Button>
                 </div>

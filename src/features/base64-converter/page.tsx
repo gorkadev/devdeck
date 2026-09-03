@@ -1,6 +1,5 @@
 import * as React from "react"
 import { CopyIcon, ArrowRightLeft } from "lucide-react"
-import { toast } from "@/components/ui/toast"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -8,6 +7,7 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Field, FieldLabel } from "@/components/ui/field"
+import { useCopy } from "@/hooks/use-copy"
 
 // Utils para soportar UTF-8 en Base64
 function encodeBase64(str: string, urlSafe: boolean): string {
@@ -53,6 +53,7 @@ function decodeBase64(str: string, urlSafe: boolean): string {
 type Mode = "encode" | "decode"
 
 export function Base64ConverterPage() {
+  const copy = useCopy()
   const [mode, setMode] = React.useState<Mode>("encode")
   const [urlSafe, setUrlSafe] = React.useState(false)
 
@@ -83,12 +84,6 @@ export function Base64ConverterPage() {
 
     setInputText(prevOut)
     setMode(prevMode === "encode" ? "decode" : "encode")
-  }
-
-  const copyToClipboard = async () => {
-    if (!outputText || outputText.startsWith("Error:")) return
-    await navigator.clipboard.writeText(outputText)
-    toast.add({ type: "success", title: "Copiado", description: "Resultado copiado al portapapeles." })
   }
 
   return (
@@ -193,7 +188,7 @@ export function Base64ConverterPage() {
                 {mode === "encode" ? "Resultado en formato Base64." : "Texto decodificado."}
               </CardDescription>
             </div>
-            <Button variant="ghost" size="icon" onClick={copyToClipboard} disabled={!outputText || outputText.startsWith("Error:")}>
+            <Button variant="ghost" size="icon" onClick={() => copy(outputText, "Resultado copiado al portapapeles.")} disabled={!outputText || outputText.startsWith("Error:")}>
               <CopyIcon className="size-4" />
             </Button>
           </CardHeader>

@@ -1,7 +1,6 @@
 import * as React from "react"
 import { CopyIcon } from "lucide-react"
 import SparkMD5 from "spark-md5"
-import { toast } from "@/components/ui/toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
@@ -10,6 +9,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Item, ItemContent, ItemTitle, ItemDescription, ItemActions, ItemGroup, ItemSeparator } from "@/components/ui/item"
 import { FieldGroup, Field, FieldLabel, FieldContent, FieldTitle, FieldDescription } from "@/components/ui/field"
+import { useCopy } from "@/hooks/use-copy"
 
 // Utils
 function arrayBufferToHex(buffer: ArrayBuffer, uppercase: boolean): string {
@@ -26,6 +26,7 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 }
 
 export function HashGeneratorPage() {
+  const copy = useCopy()
   const [inputText, setInputText] = React.useState("hello world")
   const [isUppercase, setIsUppercase] = React.useState(false)
   const [outputFormat, setOutputFormat] = React.useState<"hex" | "base64">("hex")
@@ -89,12 +90,6 @@ export function HashGeneratorPage() {
 
     return () => { active = false }
   }, [inputText, isUppercase, outputFormat])
-
-  const copyToClipboard = React.useCallback(async (text: string, label: string) => {
-    if (!text) return
-    await navigator.clipboard.writeText(text)
-    toast.add({ type: "success", title: "Copiado", description: `${label} copiado al portapapeles.` })
-  }, [])
 
   const inputBytes = new TextEncoder().encode(inputText).length
 
@@ -183,7 +178,7 @@ export function HashGeneratorPage() {
                        <ItemActions>
                          <Tooltip>
                            <TooltipTrigger render={
-                             <Button variant="ghost" size="icon-sm" onClick={() => copyToClipboard(hash.value, hash.name)}>
+                             <Button variant="ghost" size="icon-sm" onClick={() => copy(hash.value, `${hash.name} copiado al portapapeles.`)}>
                                <CopyIcon className="size-4" />
                              </Button>
                            } />

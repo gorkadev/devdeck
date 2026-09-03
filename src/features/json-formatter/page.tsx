@@ -1,10 +1,10 @@
 import * as React from "react"
 import { CopyIcon, TriangleAlertIcon } from "lucide-react"
-import { toast } from "@/components/ui/toast"
 
 import { Button } from "@/components/ui/button"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { CodeEditor } from "@/components/shared/code-editor"
+import { useCopy } from "@/hooks/use-copy"
 
 export function JsonFormatterPage() {
   const [rawInput, setRawInput] = React.useState("")
@@ -26,15 +26,7 @@ export function JsonFormatterPage() {
     }
   }
 
-  const copyToClipboard = React.useCallback(async () => {
-    if (!formattedOutput) return
-    await navigator.clipboard.writeText(formattedOutput)
-    toast.add({
-      type: "success",
-      title: "Copiado",
-      description: "JSON copiado al portapapeles.",
-    })
-  }, [formattedOutput])
+  const copy = useCopy()
 
   return (
     <div className="flex h-[calc(100vh-6rem)] flex-col gap-4">
@@ -61,7 +53,7 @@ export function JsonFormatterPage() {
             </ToggleGroup>
           </div>
 
-          <Button onClick={copyToClipboard} variant="secondary" disabled={!formattedOutput}>
+          <Button onClick={() => copy(formattedOutput, "JSON copiado al portapapeles.")} variant="secondary" disabled={!formattedOutput}>
             <CopyIcon data-icon="inline-start" />
             Copiar output
           </Button>
