@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Item, ItemContent, ItemTitle, ItemDescription, ItemActions, ItemGroup, ItemSeparator } from "@/components/ui/item"
 import { FieldGroup, Field, FieldLabel, FieldContent, FieldTitle, FieldDescription } from "@/components/ui/field"
 import { useCopy } from "@/hooks/use-copy"
+import { useURLSync } from "@/hooks/use-url-sync"
 
 // Utils
 function arrayBufferToHex(buffer: ArrayBuffer, uppercase: boolean): string {
@@ -27,9 +28,9 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 
 export function HashGeneratorPage() {
   const copy = useCopy()
-  const [inputText, setInputText] = React.useState("hello world")
-  const [isUppercase, setIsUppercase] = React.useState(false)
-  const [outputFormat, setOutputFormat] = React.useState<"hex" | "base64">("hex")
+  const [inputText, setInputText] = useURLSync<string>("input", "hello world")
+  const [isUppercase, setIsUppercase] = useURLSync<boolean>("uppercase", false)
+  const [outputFormat, setOutputFormat] = useURLSync<"hex" | "base64">("format", "hex")
   
   const [hashes, setHashes] = React.useState([
     { name: "MD5", bits: 128, value: "" },
