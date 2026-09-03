@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { CodeEditor } from "@/components/shared/code-editor"
 import { useCopy } from "@/hooks/use-copy"
+import { useURLSync } from "@/hooks/use-url-sync"
 
 export function JsonFormatterPage() {
-  const [rawInput, setRawInput] = React.useState("")
-  const [indentSize, setIndentSize] = React.useState<number>(2)
+  const copy = useCopy()
+  const [rawInput, setRawInput] = useURLSync<string>("input", "")
+  const [indentSize, setIndentSize] = useURLSync<number>("indent", 2)
 
   let parseError: string | null = null
   let formattedOutput = ""
@@ -26,11 +28,8 @@ export function JsonFormatterPage() {
     }
   }
 
-  const copy = useCopy()
-
   return (
     <div className="flex h-[calc(100vh-6rem)] flex-col gap-4">
-      {/* Header and Toolbar */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-1">
           <h1 className="text-3xl font-bold tracking-tight">JSON Formatter</h1>
@@ -43,7 +42,7 @@ export function JsonFormatterPage() {
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground font-medium">Indentación:</span>
             <ToggleGroup
-              defaultValue={["2"]}
+              value={[indentSize.toString()]}
               onValueChange={(v: string[]) => {
                 if (v.length > 0) setIndentSize(parseInt(v[0], 10))
               }}

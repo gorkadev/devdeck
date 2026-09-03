@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { useCopy } from "@/hooks/use-copy"
+import { useURLSync } from "@/hooks/use-url-sync"
 
 // Utils para soportar UTF-8 en Base64
 function encodeBase64(str: string, urlSafe: boolean): string {
@@ -54,10 +55,9 @@ type Mode = "encode" | "decode"
 
 export function Base64ConverterPage() {
   const copy = useCopy()
-  const [mode, setMode] = React.useState<Mode>("encode")
-  const [urlSafe, setUrlSafe] = React.useState(false)
-
-  const [inputText, setInputText] = React.useState("")
+  const [mode, setMode] = useURLSync<Mode>("mode", "encode")
+  const [urlSafe, setUrlSafe] = useURLSync<boolean>("urlsafe", false)
+  const [inputText, setInputText] = useURLSync<string>("input", "")
   const [outputText, setOutputText] = React.useState("")
 
   // Recalcular salida cuando cambia la entrada, el modo o urlSafe

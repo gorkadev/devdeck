@@ -10,6 +10,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { useCopy } from "@/hooks/use-copy"
+import { useURLSync } from "@/hooks/use-url-sync"
 
 type UuidVersion = "v1" | "v4" | "v6" | "v7"
 type QuoteType = "none" | "single" | "double"
@@ -29,11 +30,11 @@ const QUOTE_OPTIONS: { value: QuoteType; label: string }[] = [
 
 export function UuidGeneratorPage() {
   const copy = useCopy()
-  const [version, setVersion] = React.useState<UuidVersion>("v4")
-  const [quantity, setQuantity] = React.useState("1")
-  const [hyphens, setHyphens] = React.useState(true)
-  const [uppercase, setUppercase] = React.useState(false)
-  const [quoteType, setQuoteType] = React.useState<QuoteType>("none")
+  const [version, setVersion] = useURLSync<UuidVersion>("version", "v4")
+  const [quantity, setQuantity] = useURLSync<string>("qty", "1")
+  const [hyphens, setHyphens] = useURLSync<boolean>("hyphens", true)
+  const [uppercase, setUppercase] = useURLSync<boolean>("uppercase", false)
+  const [quoteType, setQuoteType] = useURLSync<QuoteType>("quotes", "none")
   const [rawUuids, setRawUuids] = React.useState<string[]>([])
 
   const selectedVersionLabel = VERSION_OPTIONS.find((v) => v.value === version)
@@ -146,7 +147,7 @@ export function UuidGeneratorPage() {
               <Field>
                 <FieldLabel>Cantidad</FieldLabel>
                 <ToggleGroup
-                  defaultValue={["1"]}
+                  value={[quantity]}
                   onValueChange={(v: string[]) => {
                     if (v.length > 0) setQuantity(v[0])
                   }}
