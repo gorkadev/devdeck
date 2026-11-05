@@ -10,10 +10,19 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { useCopy } from "@/hooks/use-copy"
-import { useURLSync } from "@/hooks/use-url-sync"
+import { ToolHeader } from "@/components/shared/tool-header"
+import { useToolState } from "@/hooks/use-tool-state"
+import { parsers } from "@/lib/tool-state"
 
-type UuidVersion = "v1" | "v4" | "v6" | "v7"
-type QuoteType = "none" | "single" | "double"
+const TOOL = "uuid-generator"
+const VERSIONS = ["v1", "v4", "v6", "v7"] as const
+const QUANTITIES = ["1", "5", "10", "50"] as const
+const QUOTES = ["none", "single", "double"] as const
+type UuidVersion = (typeof VERSIONS)[number]
+type Quantity = (typeof QUANTITIES)[number]
+type QuoteType = (typeof QUOTES)[number]
+
+const GENERATORS: Record<UuidVersion, () => string> = { v1: uuidv1, v4: uuidv4, v6: uuidv6, v7: uuidv7 }
 
 const VERSION_OPTIONS: { value: UuidVersion; label: string; description: string }[] = [
   { value: "v1", label: "v1", description: "Time-based" },
@@ -30,28 +39,18 @@ const QUOTE_OPTIONS: { value: QuoteType; label: string }[] = [
 
 export function UuidGeneratorPage() {
   const copy = useCopy()
-  const [version, setVersion] = useURLSync<UuidVersion>("version", "v4")
-  const [quantity, setQuantity] = useURLSync<string>("qty", "1")
-  const [hyphens, setHyphens] = useURLSync<boolean>("hyphens", true)
-  const [uppercase, setUppercase] = useURLSync<boolean>("uppercase", false)
-  const [quoteType, setQuoteType] = useURLSync<QuoteType>("quotes", "none")
+  const [version, setVersion] = useToolState<UuidVersion>(TOOL, "version", "v4", { parse: parsers.oneOf(VERSIONS) })
+  const [quantity, setQuantity] = useToolState<Quantity>(TOOL, "qty", "1", { parse: parsers.oneOf(QUANTITIES) })
+  const [hyphens, setHyphens] = useToolState(TOOL, "hyphens", true, { parse: parsers.boolean() })
+  const [uppercase, setUppercase] = useToolState(TOOL, "uppercase", false, { parse: parsers.boolean() })
+  const [quoteType, setQuoteType] = useToolState<QuoteType>(TOOL, "quotes", "none", { parse: parsers.oneOf(QUOTES) })
   const [rawUuids, setRawUuids] = React.useState<string[]>([])
 
   const selectedVersionLabel = VERSION_OPTIONS.find((v) => v.value === version)
   const selectedQuoteLabel = QUOTE_OPTIONS.find((q) => q.value === quoteType)
 
   const generateUuids = React.useCallback(() => {
-    const num = parseInt(quantity, 10) || 1
-    const newUuids: string[] = []
-
-    for (let i = 0; i < num; i++) {
-      if (version === "v1") newUuids.push(uuidv1())
-      else if (version === "v4") newUuids.push(uuidv4())
-      else if (version === "v6") newUuids.push(uuidv6())
-      else if (version === "v7") newUuids.push(uuidv7())
-    }
-
-    setRawUuids(newUuids)
+    setRawUuids(Array.from({ length: Number(quantity) }, () => GENERATORS[version]()))
   }, [version, quantity])
 
   React.useEffect(() => {
@@ -73,25 +72,27 @@ export function UuidGeneratorPage() {
   }, [rawUuids, hyphens, uppercase, quoteType])
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold tracking-tight">UUID Generator</h1>
-        <p className="text-muted-foreground text-sm">
-          Genera identificadores únicos universales en múltiples versiones y formatos.
-        </p>
-      </div>
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+      <ToolHeader
+        url="/uuid-generator"
+        description="Genera identificadores únicos universales en varias versiones y formatos."
+      />
 
-      {/* Fixed-height grid: each card fills the row, textarea scrolls internally */}
-      <div className="grid gap-6 md:grid-cols-2" style={{ gridAutoRows: "1fr" }}>
+      <div className="grid gap-4 md:grid-cols-2">
 
         {/* Output card */}
-        <Card className="flex flex-col min-h-115">
-          <CardHeader className="shrink-0">
+        <Card>
+          <CardHeader>
             <CardTitle>Resultado</CardTitle>
+            <CardDescription>
+              {rawUuids.length} UUID{rawUuids.length === 1 ? "" : "s"} {version}
+            </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-1 flex-col gap-4 overflow-hidden">
+          <CardContent className="flex flex-1 flex-col gap-4">
             <Textarea
-              className="mt-1 flex-1 overflow-y-auto font-mono resize-none text-sm"
+              aria-label="UUIDs generados"
+              spellCheck={false}
+              className="min-h-64 flex-1 resize-none font-mono text-sm"
               readOnly
               value={results}
               placeholder="Los UUIDs aparecerán aquí..."
@@ -101,7 +102,7 @@ export function UuidGeneratorPage() {
                 <RefreshCwIcon data-icon="inline-start" />
                 Generar
               </Button>
-              <Button onClick={() => copy(results, "UUID(s) copiados al portapapeles.")} variant="secondary" className="flex-1">
+              <Button onClick={() => copy(results, "UUID(s) copiados al portapapeles.")} variant="outline" className="flex-1">
                 <CopyIcon data-icon="inline-start" />
                 Copiar
               </Button>
@@ -110,8 +111,8 @@ export function UuidGeneratorPage() {
         </Card>
 
         {/* Settings card */}
-        <Card className="flex flex-col min-h-115">
-          <CardHeader className="shrink-0">
+        <Card>
+          <CardHeader>
             <CardTitle>Configuración</CardTitle>
             <CardDescription>Ajusta el comportamiento del generador.</CardDescription>
           </CardHeader>
@@ -147,12 +148,14 @@ export function UuidGeneratorPage() {
               <Field>
                 <FieldLabel>Cantidad</FieldLabel>
                 <ToggleGroup
+                  variant="outline"
+                  aria-label="Cantidad"
                   value={[quantity]}
                   onValueChange={(v: string[]) => {
-                    if (v.length > 0) setQuantity(v[0])
+                    if (v.length > 0) setQuantity(v[0] as Quantity)
                   }}
                 >
-                  {["1", "5", "10", "50"].map((q) => (
+                  {QUANTITIES.map((q) => (
                     <ToggleGroupItem key={q} value={q}>
                       {q}
                     </ToggleGroupItem>
@@ -164,7 +167,7 @@ export function UuidGeneratorPage() {
               <FieldLabel htmlFor="switch-hyphens">
                 <Field orientation="horizontal">
                   <FieldContent>
-                    <FieldTitle>Incluir Guiones</FieldTitle>
+                    <FieldTitle>Incluir guiones</FieldTitle>
                     <FieldDescription>Formato estándar 8-4-4-4-12.</FieldDescription>
                   </FieldContent>
                   <Switch
@@ -180,7 +183,7 @@ export function UuidGeneratorPage() {
                 <Field orientation="horizontal">
                   <FieldContent>
                     <FieldTitle>Mayúsculas</FieldTitle>
-                    <FieldDescription>Convertir a formato MAYÚSCULAS.</FieldDescription>
+                    <FieldDescription>Hexadecimal en MAYÚSCULAS.</FieldDescription>
                   </FieldContent>
                   <Switch
                     id="switch-uppercase"

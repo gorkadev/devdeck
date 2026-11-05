@@ -2,7 +2,8 @@ import * as React from "react"
 import { CopyIcon } from "lucide-react"
 import SparkMD5 from "spark-md5"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardAction, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
@@ -10,7 +11,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Item, ItemContent, ItemTitle, ItemDescription, ItemActions, ItemGroup, ItemSeparator } from "@/components/ui/item"
 import { FieldGroup, Field, FieldLabel, FieldContent, FieldTitle, FieldDescription } from "@/components/ui/field"
 import { useCopy } from "@/hooks/use-copy"
-import { useURLSync } from "@/hooks/use-url-sync"
+import { ToolHeader } from "@/components/shared/tool-header"
+import { useToolState } from "@/hooks/use-tool-state"
+import { parsers } from "@/lib/tool-state"
+
+const TOOL = "hash-generator"
+const FORMATS = ["hex", "base64"] as const
+type OutputFormat = (typeof FORMATS)[number]
 
 // Utils
 function arrayBufferToHex(buffer: ArrayBuffer, uppercase: boolean): string {
@@ -28,9 +35,16 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 
 export function HashGeneratorPage() {
   const copy = useCopy()
-  const [inputText, setInputText] = useURLSync<string>("input", "hello world")
-  const [isUppercase, setIsUppercase] = useURLSync<boolean>("uppercase", false)
-  const [outputFormat, setOutputFormat] = useURLSync<"hex" | "base64">("format", "hex")
+  // The input may be a password: it stays out of the URL and of localStorage.
+  const [inputText, setInputText] = useToolState(TOOL, "input", "hello world", {
+    parse: parsers.string(),
+    url: false,
+    persist: false,
+  })
+  const [isUppercase, setIsUppercase] = useToolState(TOOL, "uppercase", false, { parse: parsers.boolean() })
+  const [outputFormat, setOutputFormat] = useToolState<OutputFormat>(TOOL, "format", "hex", {
+    parse: parsers.oneOf(FORMATS),
+  })
   
   const [hashes, setHashes] = React.useState([
     { name: "MD5", bits: 128, value: "" },
@@ -92,45 +106,45 @@ export function HashGeneratorPage() {
     return () => { active = false }
   }, [inputText, isUppercase, outputFormat])
 
-  const inputBytes = new TextEncoder().encode(inputText).length
+  const inputBytes = React.useMemo(() => new TextEncoder().encode(inputText).length, [inputText])
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold tracking-tight">Hash & Crypto Generator</h1>
-        <p className="text-muted-foreground text-sm">
-          Calcula hashes criptográficos en tiempo real (MD5, SHA) en múltiples formatos.
-        </p>
-      </div>
-      
-      <div className="grid gap-6 md:grid-cols-2" style={{ gridAutoRows: "1fr" }}>
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+      <ToolHeader
+        url="/hash-generator"
+        description="Calcula hashes MD5 y SHA en tiempo real, en hexadecimal o Base64."
+      />
+
+      <div className="grid gap-4 md:grid-cols-2">
         
         {/* LEFT CARD */}
-        <Card className="flex flex-col min-h-130">
-          <CardHeader className="shrink-0 flex flex-row justify-between items-center space-y-0">
-             <div>
-                <CardTitle>Entrada</CardTitle>
-                <CardDescription>Se ejecuta en tu navegador.</CardDescription>
-             </div>
-             <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded-md">{inputBytes} bytes</span>
+        <Card>
+          <CardHeader>
+            <CardTitle>Entrada</CardTitle>
+            <CardDescription>Se procesa en tu navegador y no se guarda.</CardDescription>
+            <CardAction>
+              <Badge variant="secondary">{inputBytes} bytes</Badge>
+            </CardAction>
           </CardHeader>
-          <CardContent className="flex flex-1 flex-col overflow-hidden gap-4">
-            <Textarea 
+          <CardContent className="flex flex-1 flex-col">
+            <Textarea
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               placeholder="Introduce el texto aquí..."
-              className="my-1 flex-1 resize-none font-mono text-sm overflow-y-auto"
+              aria-label="Texto a hashear"
+              spellCheck={false}
+              className="min-h-40 flex-1 resize-none font-mono text-sm"
             />
           </CardContent>
         </Card>
 
         {/* RIGHT CARD */}
-        <Card className="flex flex-col min-h-130">
-          <CardHeader className="shrink-0">
+        <Card>
+          <CardHeader>
              <CardTitle>Resultados</CardTitle>
              <CardDescription>Configura y visualiza los hashes generados.</CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-1 flex-col overflow-hidden gap-6">
+          <CardContent className="flex flex-1 flex-col gap-6">
              
              {/* CONFIGURATION */}
              <FieldGroup className="shrink-0">
@@ -138,7 +152,7 @@ export function HashGeneratorPage() {
                  <Field orientation="horizontal">
                    <FieldContent>
                      <FieldTitle>Mayúsculas</FieldTitle>
-                     <FieldDescription>Convertir a formato HEX en mayúsculas.</FieldDescription>
+                     <FieldDescription>Solo aplica al formato hexadecimal.</FieldDescription>
                    </FieldContent>
                    <Switch
                      id="switch-uppercase"
@@ -150,10 +164,10 @@ export function HashGeneratorPage() {
                </FieldLabel>
 
                <Field>
-                 <FieldLabel>Formato de Salida</FieldLabel>
+                 <FieldLabel>Formato de salida</FieldLabel>
                  <ToggleGroup 
                     value={[outputFormat]} 
-                    onValueChange={(v: string[]) => { if (v.length > 0) setOutputFormat(v[0] as "hex" | "base64") }}
+                    onValueChange={(v: string[]) => { if (v.length > 0) setOutputFormat(v[0] as OutputFormat) }}
                     className="justify-start w-full"
                  >
                    <ToggleGroupItem value="hex" className="flex-1">HEX</ToggleGroupItem>
@@ -163,7 +177,7 @@ export function HashGeneratorPage() {
              </FieldGroup>
              
              {/* HASHES LIST */}
-             <div className="flex-1 overflow-y-auto -mx-2 px-2">
+             <div>
                <ItemGroup>
                  {hashes.map((hash, i) => (
                    <React.Fragment key={hash.name}>
@@ -179,8 +193,8 @@ export function HashGeneratorPage() {
                        <ItemActions>
                          <Tooltip>
                            <TooltipTrigger render={
-                             <Button variant="ghost" size="icon-sm" onClick={() => copy(hash.value, `${hash.name} copiado al portapapeles.`)}>
-                               <CopyIcon className="size-4" />
+                             <Button variant="ghost" size="icon-sm" aria-label={`Copiar ${hash.name}`} disabled={!hash.value} onClick={() => copy(hash.value, `${hash.name} copiado al portapapeles.`)}>
+                               <CopyIcon />
                              </Button>
                            } />
                            <TooltipContent>Copiar {hash.name}</TooltipContent>

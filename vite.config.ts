@@ -15,18 +15,10 @@ export default defineConfig({
     outDir: "dist/devdeck",
     emptyOutDir: true,
   },
-  plugins: [tanstackRouter(), react(), tailwindcss()],
+  plugins: [tanstackRouter({ target: "react", autoCodeSplitting: true }), react(), tailwindcss()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
-  },
-  server: {
-    // The managed preview probes 3000, but the flags it passes after `pnpm dev --`
-    // never reach vite (the extra `--` turns them into positional args). Declaring
-    // the port here keeps `pnpm dev` serving where the preview expects it.
-    host: "0.0.0.0",
-    port: 3000,
-    strictPort: true,
   },
 })
