@@ -1,207 +1,194 @@
 import * as React from "react"
-import { CopyIcon, ArrowRightLeft } from "lucide-react"
+import { ArrowDownUpIcon, CopyIcon, EraserIcon, SparklesIcon, TriangleAlertIcon } from "lucide-react"
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Field, FieldLabel } from "@/components/ui/field"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { Field, FieldLabel } from "@/components/ui/field"
+import { ToolHeader } from "@/components/shared/tool-header"
 import { useCopy } from "@/hooks/use-copy"
-import { useURLSync } from "@/hooks/use-url-sync"
+import { useToolState } from "@/hooks/use-tool-state"
+import { parsers } from "@/lib/tool-state"
 
-// Utils para soportar UTF-8 en Base64
-function encodeBase64(str: string, urlSafe: boolean): string {
-  try {
-    const bytes = new TextEncoder().encode(str)
-    const binaryString = Array.from(bytes).map(b => String.fromCharCode(b)).join('')
-    let base64 = btoa(binaryString)
+const TOOL = "base64-converter"
+const MODES = ["encode", "decode"] as const
+type Mode = (typeof MODES)[number]
 
-    if (urlSafe) {
-      base64 = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-    }
+type Result = { ok: true; text: string } | { ok: false; error: string }
 
-    return base64
-  } catch (e) {
-    return "Error: " + (e as Error).message
+function bytesToBinary(bytes: Uint8Array) {
+  let binary = ""
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return binary
+}
+
+function encodeBase64(text: string, urlSafe: boolean): Result {
+  const base64 = btoa(bytesToBinary(new TextEncoder().encode(text)))
+  return {
+    ok: true,
+    text: urlSafe ? base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "") : base64,
   }
 }
 
-function decodeBase64(str: string, urlSafe: boolean): string {
+function decodeBase64(input: string): Result {
+  // Accept both alphabets and missing padding: users paste whatever they have.
+  let base64 = input.replace(/\s+/g, "").replace(/-/g, "+").replace(/_/g, "/")
+  if (base64.length % 4 === 1) return { ok: false, error: "La longitud no corresponde a Base64." }
+  while (base64.length % 4) base64 += "="
   try {
-    let base64 = str.trim()
-
-    if (urlSafe) {
-      base64 = base64.replace(/-/g, '+').replace(/_/g, '/')
-      // Añadir padding omitido
-      while (base64.length % 4) {
-        base64 += '='
-      }
+    const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
+    return { ok: true, text: new TextDecoder("utf-8", { fatal: true }).decode(bytes) }
+  } catch (error) {
+    return {
+      ok: false,
+      error:
+        error instanceof TypeError
+          ? "El contenido decodificado no es texto UTF-8 (probablemente datos binarios)."
+          : "Contiene caracteres que no pertenecen a Base64.",
     }
-
-    const binaryString = atob(base64)
-    const bytes = new Uint8Array(binaryString.length)
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i)
-    }
-
-    return new TextDecoder().decode(bytes)
-  } catch {
-    return "Error: Cadena Base64 inválida."
   }
 }
-
-type Mode = "encode" | "decode"
 
 export function Base64ConverterPage() {
   const copy = useCopy()
-  const [mode, setMode] = useURLSync<Mode>("mode", "encode")
-  const [urlSafe, setUrlSafe] = useURLSync<boolean>("urlsafe", false)
-  const [inputText, setInputText] = useURLSync<string>("input", "")
-  const [outputText, setOutputText] = React.useState("")
+  const [mode, setMode] = useToolState<Mode>(TOOL, "mode", "encode", { parse: parsers.oneOf(MODES) })
+  const [urlSafe, setUrlSafe] = useToolState(TOOL, "urlsafe", false, { parse: parsers.boolean() })
+  const [input, setInput] = useToolState(TOOL, "input", "", { parse: parsers.string() })
 
-  // Recalcular salida cuando cambia la entrada, el modo o urlSafe
-  React.useEffect(() => {
-    if (!inputText) {
-      setOutputText("")
-      return
-    }
+  const result = React.useMemo<Result>(() => {
+    if (!input) return { ok: true, text: "" }
+    return mode === "encode" ? encodeBase64(input, urlSafe) : decodeBase64(input)
+  }, [input, mode, urlSafe])
 
-    if (mode === "encode") {
-      setOutputText(encodeBase64(inputText, urlSafe))
-    } else {
-      setOutputText(decodeBase64(inputText, urlSafe))
-    }
-  }, [inputText, mode, urlSafe])
+  const output = result.ok ? result.text : ""
+  const inputBytes = React.useMemo(() => new TextEncoder().encode(input).length, [input])
 
   const handleSwap = () => {
-    // Si queremos intercambiar entrada y salida:
-    const prevOut = outputText
-    const prevMode = mode
-
-    // Si había error, no intercambiar un mensaje de error
-    if (prevOut.startsWith("Error:")) return
-
-    setInputText(prevOut)
-    setMode(prevMode === "encode" ? "decode" : "encode")
+    if (!result.ok) return
+    setInput(output)
+    setMode(mode === "encode" ? "decode" : "encode")
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold tracking-tight">Base64 Encoder & Decoder</h1>
-        <p className="text-muted-foreground text-sm">
-          Codifica y decodifica texto plano en Base64. Soporta caracteres especiales (UTF-8) y formato URL-safe.
-        </p>
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+      <ToolHeader
+        url="/base64-converter"
+        description="Codifica y decodifica texto en Base64. Soporta UTF-8 y el formato URL-safe."
+      />
+
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-3 shadow-xs">
+        <div className="flex flex-wrap items-center gap-4">
+          <ToggleGroup
+            variant="outline"
+            aria-label="Modo"
+            value={[mode]}
+            onValueChange={(v: string[]) => {
+              if (v.length > 0) setMode(v[0] as Mode)
+            }}
+          >
+            <ToggleGroupItem value="encode">Codificar</ToggleGroupItem>
+            <ToggleGroupItem value="decode">Decodificar</ToggleGroupItem>
+          </ToggleGroup>
+          <Field orientation="horizontal" className="w-auto" data-disabled={mode === "decode" || undefined}>
+            <Switch
+              id="urlsafe-switch"
+              checked={urlSafe}
+              onCheckedChange={setUrlSafe}
+              disabled={mode === "decode"}
+            />
+            <FieldLabel htmlFor="urlsafe-switch" className="whitespace-nowrap">
+              URL-safe
+            </FieldLabel>
+          </Field>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" onClick={handleSwap} disabled={!result.ok || !output}>
+            <ArrowDownUpIcon data-icon="inline-start" />
+            Intercambiar
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setMode("encode")
+              setInput("¡Hola, DevDeck! 👋")
+            }}
+          >
+            <SparklesIcon data-icon="inline-start" />
+            Ejemplo
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setInput("")} disabled={!input}>
+            <EraserIcon data-icon="inline-start" />
+            Limpiar
+          </Button>
+        </div>
       </div>
 
-      {/* TOP CONTROLS */}
-      <Card>
-        <CardContent className="flex flex-col sm:flex-row items-center gap-4">
-          {/* Left section: Toggle + URL Safe */}
-          <div className="flex-1 flex flex-row items-center gap-6 justify-start">
-            <ToggleGroup
-              value={[mode]}
-              onValueChange={(v: string[]) => { if (v.length > 0) setMode(v[0] as Mode) }}
-              className="justify-start"
-            >
-              <ToggleGroupItem value="encode" className="px-4">Encode</ToggleGroupItem>
-              <ToggleGroupItem value="decode" className="px-4">Decode</ToggleGroupItem>
-            </ToggleGroup>
-
-            <Field orientation="horizontal">
-              <Switch
-                id="urlsafe-switch"
-                checked={urlSafe}
-                onCheckedChange={setUrlSafe}
-              />
-              <FieldLabel htmlFor="urlsafe-switch">
-                URL-safe
-              </FieldLabel>
-            </Field>
-          </div>
-
-          {/* Middle section: Swap */}
-          <div className="flex flex-row items-center justify-center">
-            <Button variant="secondary" onClick={handleSwap}>
-              <ArrowRightLeft data-icon="inline-start" className="size-4" />
-              Swap
-            </Button>
-          </div>
-
-          {/* Right section: Load Sample + Clear */}
-          <div className="flex-1 flex flex-row items-center gap-2 justify-end">
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setMode("encode")
-                setInputText("Hello DevDeck!")
-              }}
-            >
-              Load sample
-            </Button>
-            <Button 
-              variant="destructive" 
-              onClick={() => setInputText("")}
-              disabled={!inputText}
-            >
-              Clear
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* 2-COLUMN GRID */}
-      <div className="grid gap-6 md:grid-cols-2" style={{ gridAutoRows: "1fr" }}>
-
-        {/* LEFT CARD: Input */}
-        <Card className="flex flex-col min-h-115">
-          <CardHeader className="shrink-0 flex flex-row justify-between items-center space-y-0">
-            <div>
-              <CardTitle>Entrada</CardTitle>
-              <CardDescription>
-                {mode === "encode" ? "Introduce el texto a codificar." : "Introduce el Base64 a decodificar."}
-              </CardDescription>
-            </div>
-            {inputText && mode === "encode" && (
-              <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded-md">
-                {new TextEncoder().encode(inputText).length} bytes
-              </span>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Entrada</CardTitle>
+            <CardDescription>
+              {mode === "encode" ? "Texto a codificar." : "Base64 a decodificar."}
+            </CardDescription>
+            {input && (
+              <CardAction>
+                <Badge variant="secondary">{inputBytes} bytes</Badge>
+              </CardAction>
             )}
           </CardHeader>
-          <CardContent className="flex flex-1 flex-col overflow-hidden gap-4">
+          <CardContent>
             <Textarea
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              placeholder={mode === "encode" ? "Introduce el texto aquí..." : "Paste Base64 to decode..."}
-              className="my-1 flex-1 resize-none font-mono text-sm overflow-y-auto"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={mode === "encode" ? "Escribe o pega el texto..." : "Pega el Base64..."}
+              aria-label="Entrada"
+              spellCheck={false}
+              className="h-64 resize-none font-mono text-sm md:h-80"
             />
           </CardContent>
         </Card>
 
-        {/* RIGHT CARD: Output */}
-        <Card className="flex flex-col min-h-115">
-          <CardHeader className="shrink-0 flex flex-row justify-between items-center space-y-0">
-            <div>
-              <CardTitle>Salida</CardTitle>
-              <CardDescription>
-                {mode === "encode" ? "Resultado en formato Base64." : "Texto decodificado."}
-              </CardDescription>
-            </div>
-            <Button variant="ghost" size="icon" onClick={() => copy(outputText, "Resultado copiado al portapapeles.")} disabled={!outputText || outputText.startsWith("Error:")}>
-              <CopyIcon className="size-4" />
-            </Button>
+        <Card>
+          <CardHeader>
+            <CardTitle>Salida</CardTitle>
+            <CardDescription>
+              {mode === "encode" ? "Resultado en Base64." : "Texto decodificado."}
+            </CardDescription>
+            <CardAction>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Copiar resultado"
+                onClick={() => copy(output, "Resultado copiado al portapapeles.")}
+                disabled={!output}
+              >
+                <CopyIcon />
+              </Button>
+            </CardAction>
           </CardHeader>
-          <CardContent className="flex flex-1 flex-col overflow-hidden gap-6">
-            <Textarea
-              value={outputText}
-              readOnly
-              placeholder="El resultado aparecerá aquí..."
-              className={`my-1 flex-1 resize-none font-mono text-sm overflow-y-auto ${outputText.startsWith("Error:") ? "text-destructive" : ""}`}
-            />
+          <CardContent>
+            {result.ok ? (
+              <Textarea
+                value={output}
+                readOnly
+                placeholder="El resultado aparecerá aquí..."
+                aria-label="Salida"
+                className="h-64 resize-none font-mono text-sm break-all md:h-80"
+              />
+            ) : (
+              <Alert variant="destructive">
+                <TriangleAlertIcon />
+                <AlertTitle>Base64 inválido</AlertTitle>
+                <AlertDescription>{result.error}</AlertDescription>
+              </Alert>
+            )}
           </CardContent>
         </Card>
-
       </div>
     </div>
   )

@@ -1,435 +1,422 @@
 import * as React from "react"
-import { ShieldAlertIcon, ShieldCheckIcon, CopyIcon, TrashIcon, TerminalIcon } from "lucide-react"
-import { jwtVerify, decodeJwt, decodeProtectedHeader, SignJWT, base64url } from "jose"
+import {
+  CheckCircle2Icon,
+  ClockIcon,
+  CopyIcon,
+  EraserIcon,
+  ShieldAlertIcon,
+  ShieldCheckIcon,
+  TriangleAlertIcon,
+} from "lucide-react"
+import { SignJWT, base64url, compactVerify, decodeJwt, decodeProtectedHeader } from "jose"
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CodeEditor } from "@/components/shared/code-editor"
 import { jwtHighlightPlugin } from "@/components/shared/jwt-highlight-plugin"
+import { ToolHeader } from "@/components/shared/tool-header"
 import { useCopy } from "@/hooks/use-copy"
-import { useURLSync } from "@/hooks/use-url-sync"
+import { useToolState } from "@/hooks/use-tool-state"
+import { parsers } from "@/lib/tool-state"
 
-// Token de ejemplo por defecto (firmado con "your-256-bit-secret" para que la
-// verificación de firma funcione al cargar la página)
-const DEFAULT_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.reGQzG3OKdoIMWLDKOZ4TICJit3EW69cQE72E2CfzRE"
+const TOOL = "jwt-decoder"
+const TABS = ["decoder", "encoder"] as const
+type Tab = (typeof TABS)[number]
+
+// Tokens and keys are credentials: they live in memory only. `url: false` also
+// strips them from links created by older versions that put them in the URL.
+const SECRET = { parse: parsers.string(), url: false, persist: false } as const
+
+// Example token signed with "your-256-bit-secret", so verification can be tried right away.
+const DEFAULT_TOKEN =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.reGQzG3OKdoIMWLDKOZ4TICJit3EW69cQE72E2CfzRE"
+const DEFAULT_HEADER = '{\n  "alg": "HS256",\n  "typ": "JWT"\n}'
+const DEFAULT_PAYLOAD = '{\n  "sub": "1234567890",\n  "name": "John Doe",\n  "iat": 1516239022\n}'
+const HMAC_ALGORITHMS = ["HS256", "HS384", "HS512"]
+
+const EDITOR_SETUP = { lineNumbers: false, foldGutter: false }
+
+function secretToKey(secret: string, isBase64Url: boolean) {
+  return isBase64Url ? base64url.decode(secret) : new TextEncoder().encode(secret)
+}
+
+function formatDate(seconds: number) {
+  return new Date(seconds * 1000).toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" })
+}
+
+type Decoded =
+  | { status: "empty" }
+  | { status: "error"; message: string }
+  | { status: "ok"; header: Record<string, unknown>; payload: Record<string, unknown> }
+
+function decodeToken(token: string): Decoded {
+  if (!token.trim()) return { status: "empty" }
+  try {
+    return {
+      status: "ok",
+      header: decodeProtectedHeader(token.trim()) as Record<string, unknown>,
+      payload: decodeJwt(token.trim()) as Record<string, unknown>,
+    }
+  } catch (error) {
+    return { status: "error", message: error instanceof Error ? error.message : "Formato JWT inválido" }
+  }
+}
 
 export function JwtDecoderPage() {
-  const copy = useCopy()
-  const [token, setToken] = useURLSync<string>("token", DEFAULT_TOKEN)
-  const [secret, setSecret] = useURLSync<string>("secret", "")
-  const [isBase64Url, setIsBase64Url] = useURLSync<boolean>("b64url", false)
-
-  // Decoded state
-  const [header, setHeader] = React.useState<unknown>(null)
-  const [payload, setPayload] = React.useState<unknown>(null)
-  const [parseError, setParseError] = React.useState<string | null>(null)
-  
-  // Verification state
-  const [isValidSignature, setIsValidSignature] = React.useState<boolean | null>(null)
-
-  // Encoder state
-  const [encoderHeader, setEncoderHeader] = useURLSync<string>("enc-header", '{\n  "alg": "HS256",\n  "typ": "JWT"\n}')
-  const [encoderPayload, setEncoderPayload] = useURLSync<string>("enc-payload", '{\n  "sub": "1234567890",\n  "name": "John Doe",\n  "iat": 1516239022\n}')
-  const [encoderSecret, setEncoderSecret] = useURLSync<string>("enc-secret", "your-256-bit-secret")
-  const [isEncoderBase64Url, setIsEncoderBase64Url] = useURLSync<boolean>("enc-b64url", false)
-  const [generatedToken, setGeneratedToken] = React.useState("")
-  const [encoderHeaderError, setEncoderHeaderError] = React.useState<string | null>(null)
-  const [encoderPayloadError, setEncoderPayloadError] = React.useState<string | null>(null)
-
-  // Analizar el token básico (solo decode)
-  React.useEffect(() => {
-    if (!token.trim()) {
-      setHeader(null)
-      setPayload(null)
-      setParseError(null)
-      setIsValidSignature(null)
-      return
-    }
-
-    try {
-      const h = decodeProtectedHeader(token)
-      const p = decodeJwt(token)
-      setHeader(h)
-      setPayload(p)
-      setParseError(null)
-    } catch (e: unknown) {
-      setHeader(null)
-      setPayload(null)
-      if (e instanceof Error) {
-        setParseError(e.message || "Invalid JWT format")
-      } else {
-        setParseError("Invalid JWT format")
-      }
-      setIsValidSignature(null)
-    }
-  }, [token])
-
-  // Validar firma si hay secreto
-  React.useEffect(() => {
-    if (!token || !secret || parseError) {
-      setIsValidSignature(null)
-      return
-    }
-
-    const verify = async () => {
-      try {
-        const secretKey = isBase64Url
-          ? base64url.decode(secret)
-          : new TextEncoder().encode(secret)
-
-        await jwtVerify(token, secretKey)
-        setIsValidSignature(true)
-      } catch {
-        setIsValidSignature(false)
-      }
-    }
-
-    verify()
-  }, [token, secret, parseError, isBase64Url])
-
-  const copyToken = (text: string) => copy(text, "Token copiado al portapapeles.")
-
-  // Encode effect
-  React.useEffect(() => {
-    let parsedHeader: Record<string, unknown> | null = null
-    let parsedPayload: Record<string, unknown> | null = null
-    
-    // Parse header
-    try {
-      parsedHeader = JSON.parse(encoderHeader)
-      setEncoderHeaderError(null)
-    } catch {
-      setEncoderHeaderError("Invalid JSON format")
-    }
-
-    // Parse payload
-    try {
-      parsedPayload = JSON.parse(encoderPayload)
-      setEncoderPayloadError(null)
-    } catch {
-      setEncoderPayloadError("Invalid JSON format")
-    }
-
-    if (parsedHeader && parsedPayload) {
-      const sign = async () => {
-        try {
-          const secretKey = isEncoderBase64Url
-            ? base64url.decode(encoderSecret)
-            : new TextEncoder().encode(encoderSecret)
-          const token = await new SignJWT(parsedPayload)
-            .setProtectedHeader(parsedHeader as { alg: string; [key: string]: unknown })
-            .sign(secretKey)
-          
-          setGeneratedToken(token)
-        } catch {
-          setGeneratedToken("")
-        }
-      }
-      sign()
-    } else {
-      setGeneratedToken("")
-    }
-  }, [encoderHeader, encoderPayload, encoderSecret, isEncoderBase64Url])
-
-  // Cast payload to access properties safely in the render
-  const payloadObj = payload as Record<string, unknown> | null;
+  const [tab, setTab] = useToolState<Tab>(TOOL, "tab", "decoder", { parse: parsers.oneOf(TABS) })
 
   return (
-    <div className="flex h-[calc(100vh-6rem)] flex-col gap-4">
-      <Tabs defaultValue="decoder" className="flex h-full flex-col">
-        <div className="flex items-center justify-between">
-          <TabsList>
-            <TabsTrigger value="decoder">JWT Decoder</TabsTrigger>
-            <TabsTrigger value="encoder">JWT Encoder</TabsTrigger>
-          </TabsList>
-        </div>
-
-        <TabsContent value="decoder" className="flex-1 mt-4 data-[state=inactive]:hidden outline-none">
-          <div className="grid h-full gap-2 lg:grid-cols-2">
-            
-            {/* LEFT COLUMN - INPUT */}
-            <div className="flex min-h-0 flex-col gap-2 px-2 pb-4">
-              <h2 className="text-lg font-semibold">Encoded Token</h2>
-              <Card className="flex-1 flex flex-col min-h-100">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div className="flex items-center gap-2 font-mono text-sm text-muted-foreground">
-                    <TerminalIcon className="size-4" />
-                    <span>JSON Web Token (JWT)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Tooltip>
-                      <TooltipTrigger render={<Button variant="ghost" size="icon-sm" onClick={() => copyToken(token)}><CopyIcon /></Button>} />
-                      <TooltipContent>Copy Token</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger render={<Button variant="destructive" size="icon-sm" onClick={() => setToken("")}><TrashIcon /></Button>} />
-                      <TooltipContent>Clear</TooltipContent>
-                    </Tooltip>
-                  </div>
-                </CardHeader>
-                <CardContent className="flex-1 flex flex-col relative">
-                  <div className="flex-1 flex flex-col relative rounded-xl bg-muted/50 overflow-hidden">
-                    <CodeEditor
-                      value={token}
-                      onChange={setToken}
-                      language="none"
-                      className="border-0 bg-transparent flex-1 focus-visible:ring-0 break-all whitespace-pre-wrap"
-                      extensions={[jwtHighlightPlugin]}
-                      basicSetup={{
-                        lineNumbers: false,
-                        foldGutter: false,
-                      }}
-                    />
-                  </div>
-                </CardContent>
-                <CardFooter className="text-sm font-medium">
-                  {parseError ? (
-                     <span className="text-destructive flex items-center gap-1"><ShieldAlertIcon className="size-4" /> Invalid JWT</span>
-                  ) : token ? (
-                     <span className="text-emerald-500 flex items-center gap-1"><ShieldCheckIcon className="size-4" /> Valid JWT format</span>
-                  ) : null}
-                  
-                  {isValidSignature === true && (
-                    <span className="text-emerald-500 flex items-center gap-1"><ShieldCheckIcon className="size-4" /> Signature Verified</span>
-                  )}
-                  {isValidSignature === false && (
-                    <span className="text-destructive flex items-center gap-1"><ShieldAlertIcon className="size-4" /> Invalid Signature</span>
-                  )}
-                </CardFooter>
-              </Card>
-            </div>
-
-            {/* RIGHT COLUMN - OUTPUT */}
-            <div className="flex min-h-0 flex-col gap-6 overflow-y-auto px-2 pb-4">
-              
-              {/* HEADER */}
-              <div className="flex flex-col gap-2">
-                <h2 className="text-lg font-semibold">Decoded Header</h2>
-                <Card>
-                   <CardHeader>
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className="font-semibold text-destructive">JSON</span>
-                      <span className="text-muted-foreground">Algorithm & Token Type</span>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex-1 flex flex-col relative rounded-xl bg-muted/50 overflow-hidden">
-                      <CodeEditor
-                        value={header ? JSON.stringify(header, null, 2) : ""}
-                        readOnly
-                        className="border-0 bg-transparent flex-1"
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* PAYLOAD */}
-              <div className="flex flex-col gap-2">
-                <h2 className="text-lg font-semibold">Decoded Payload</h2>
-                <Card>
-                   <CardHeader>
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className="font-semibold text-primary">JSON</span>
-                      <span className="text-muted-foreground">Data Claims</span>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex-1 flex flex-col relative rounded-xl bg-muted/50 overflow-hidden">
-                      <CodeEditor
-                        value={payload ? JSON.stringify(payload, null, 2) : ""}
-                        readOnly
-                        className="border-0 bg-transparent flex-1"
-                      />
-                      {/* Mostrar fechas decodificadas extra si existen */}
-                      {payloadObj && (typeof payloadObj.iat === 'number' || typeof payloadObj.exp === 'number') && (
-                        <div className="absolute top-2 right-4 flex flex-col items-end gap-1 pointer-events-none">
-                          {typeof payloadObj.iat === 'number' && <span className="text-xs text-muted-foreground bg-background/80 px-2 py-0.5 rounded-md">iat: {new Date(payloadObj.iat * 1000).toLocaleString()}</span>}
-                          {typeof payloadObj.exp === 'number' && <span className="text-xs text-muted-foreground bg-background/80 px-2 py-0.5 rounded-md">exp: {new Date(payloadObj.exp * 1000).toLocaleString()}</span>}
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* SIGNATURE VERIFICATION */}
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-semibold">Verify Signature</h2>
-                    <p className="text-xs text-muted-foreground">Enter the secret used to sign the JWT below:</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="base64-switch" className="text-xs text-muted-foreground font-semibold tracking-wider">BASE64URL ENCODED</Label>
-                    <Switch id="base64-switch" checked={isBase64Url} onCheckedChange={setIsBase64Url} />
-                  </div>
-                </div>
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center gap-2 font-mono text-sm text-chart-2">
-                      <TerminalIcon className="size-4" />
-                      <span>Secret</span>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                      <Input 
-                        value={secret} 
-                        onChange={(e) => setSecret(e.target.value)} 
-                        placeholder="your-256-bit-secret"
-                        className="font-mono"
-                      />
-                  </CardContent>
-                </Card>
-              </div>
-
-            </div>
-          </div>
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+      <ToolHeader url="/jwt-decoder" />
+      <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)} className="gap-6">
+        <TabsList>
+          <TabsTrigger value="decoder">Decodificar</TabsTrigger>
+          <TabsTrigger value="encoder">Firmar</TabsTrigger>
+        </TabsList>
+        <TabsContent value="decoder" keepMounted>
+          <Decoder />
         </TabsContent>
-
-        <TabsContent value="encoder" className="flex-1 mt-4 data-[state=inactive]:hidden outline-none">
-          <div className="grid h-full gap-2 lg:grid-cols-2">
-            
-            {/* LEFT COLUMN - INPUTS */}
-            <div className="flex min-h-0 flex-col gap-6 px-2 pb-4">
-              
-              {/* ENCODER HEADER */}
-              <div className="flex flex-col gap-2">
-                <h2 className="text-lg font-semibold">Header</h2>
-                <Card>
-                   <CardHeader className="flex flex-row items-center justify-between">
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className="font-semibold text-destructive">JSON</span>
-                      <span className="text-muted-foreground">Algorithm & Token Type</span>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex-1 flex flex-col relative rounded-xl bg-muted/50 overflow-hidden">
-                      <CodeEditor
-                        value={encoderHeader}
-                        onChange={setEncoderHeader}
-                        className="border-0 bg-transparent flex-1"
-                      />
-                    </div>
-                  </CardContent>
-                  <CardFooter className="text-sm font-medium">
-                    {encoderHeaderError ? (
-                      <span className="text-destructive flex items-center gap-1"><ShieldAlertIcon className="size-4" /> {encoderHeaderError}</span>
-                    ) : (
-                      <span className="text-emerald-500 flex items-center gap-1"><ShieldCheckIcon className="size-4" /> Valid JSON format</span>
-                    )}
-                  </CardFooter>
-                </Card>
-              </div>
-
-              {/* ENCODER PAYLOAD */}
-              <div className="flex flex-col gap-2">
-                <h2 className="text-lg font-semibold">Payload</h2>
-                <Card>
-                   <CardHeader className="flex flex-row items-center justify-between">
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className="font-semibold text-primary">JSON</span>
-                      <span className="text-muted-foreground">Data Claims</span>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex-1 flex flex-col relative rounded-xl bg-muted/50 overflow-hidden">
-                      <CodeEditor
-                        value={encoderPayload}
-                        onChange={setEncoderPayload}
-                        className="border-0 bg-transparent flex-1"
-                      />
-                    </div>
-                  </CardContent>
-                  <CardFooter className="text-sm font-medium">
-                    {encoderPayloadError ? (
-                      <span className="text-destructive flex items-center gap-1"><ShieldAlertIcon className="size-4" /> {encoderPayloadError}</span>
-                    ) : (
-                      <span className="text-emerald-500 flex items-center gap-1"><ShieldCheckIcon className="size-4" /> Valid JSON format</span>
-                    )}
-                  </CardFooter>
-                </Card>
-              </div>
-
-              {/* ENCODER SECRET */}
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-semibold">Signing Secret</h2>
-                    <p className="text-xs text-muted-foreground">Enter the secret used to sign the JWT below:</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="enc-base64-switch" className="text-xs text-muted-foreground font-semibold tracking-wider">BASE64URL ENCODED</Label>
-                    <Switch id="enc-base64-switch" checked={isEncoderBase64Url} onCheckedChange={setIsEncoderBase64Url} />
-                  </div>
-                </div>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <div className="flex items-center gap-2 font-mono text-sm text-chart-2">
-                      <TerminalIcon className="size-4" />
-                      <span>Secret</span>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                      <Input 
-                        value={encoderSecret} 
-                        onChange={(e) => setEncoderSecret(e.target.value)} 
-                        placeholder="your-256-bit-secret"
-                        className="font-mono"
-                      />
-                  </CardContent>
-                </Card>
-              </div>
-
-            </div>
-
-            {/* RIGHT COLUMN - OUTPUT */}
-            <div className="flex min-h-0 flex-col gap-2 px-2 pb-4">
-              <h2 className="text-lg font-semibold">Encoded Token</h2>
-              <Card className="flex-1 flex flex-col min-h-100">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div className="flex items-center gap-2 font-mono text-sm text-muted-foreground">
-                    <TerminalIcon className="size-4" />
-                    <span>JSON Web Token (JWT)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Tooltip>
-                      <TooltipTrigger render={<Button variant="ghost" size="icon-sm" onClick={() => copyToken(generatedToken)}><CopyIcon /></Button>} />
-                      <TooltipContent>Copy Token</TooltipContent>
-                    </Tooltip>
-                  </div>
-                </CardHeader>
-                <CardContent className="flex-1 flex flex-col relative">
-                  <div className="flex-1 flex flex-col relative rounded-xl bg-muted/50 overflow-hidden">
-                    <CodeEditor
-                      value={generatedToken}
-                      readOnly
-                      language="none"
-                      className="border-0 bg-transparent flex-1 focus-visible:ring-0 break-all whitespace-pre-wrap"
-                      extensions={[jwtHighlightPlugin]}
-                      basicSetup={{
-                        lineNumbers: false,
-                        foldGutter: false,
-                      }}
-                    />
-                  </div>
-                </CardContent>
-                <CardFooter className="text-sm font-medium">
-                  {generatedToken ? (
-                     <span className="text-emerald-500 flex items-center gap-1"><ShieldCheckIcon className="size-4" /> Token Generated</span>
-                  ) : (
-                     <span className="text-destructive flex items-center gap-1"><ShieldAlertIcon className="size-4" /> Waiting for valid inputs...</span>
-                  )}
-                </CardFooter>
-              </Card>
-            </div>
-          </div>
+        <TabsContent value="encoder" keepMounted>
+          <Encoder />
         </TabsContent>
       </Tabs>
     </div>
+  )
+}
+
+function Decoder() {
+  const copy = useCopy()
+  const [token, setToken] = useToolState(TOOL, "token", DEFAULT_TOKEN, SECRET)
+  const [secret, setSecret] = useToolState(TOOL, "secret", "", SECRET)
+  const [isBase64Url, setIsBase64Url] = useToolState(TOOL, "b64url", false, { parse: parsers.boolean() })
+  const [signature, setSignature] = React.useState<"valid" | "invalid" | "unsupported" | null>(null)
+
+  const decoded = React.useMemo(() => decodeToken(token), [token])
+  const alg = decoded.status === "ok" ? String(decoded.header.alg ?? "") : ""
+
+  // Only the signature is checked here. Expiry is reported separately below, so
+  // an expired token signed with the right key is not shown as "invalid".
+  React.useEffect(() => {
+    if (decoded.status !== "ok" || !secret) {
+      setSignature(null)
+      return
+    }
+    if (!HMAC_ALGORITHMS.includes(alg)) {
+      setSignature("unsupported")
+      return
+    }
+    let cancelled = false
+    compactVerify(token.trim(), secretToKey(secret, isBase64Url), { algorithms: [alg] })
+      .then(() => !cancelled && setSignature("valid"))
+      .catch(() => !cancelled && setSignature("invalid"))
+    return () => {
+      cancelled = true
+    }
+  }, [decoded, alg, token, secret, isBase64Url])
+
+  const payload = decoded.status === "ok" ? decoded.payload : null
+  // Snapshot of "now" for the expiry badge; refreshed whenever the page mounts.
+  const [now] = React.useState(() => Date.now() / 1000)
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <Card className="lg:self-start">
+        <CardHeader>
+          <CardTitle>Token</CardTitle>
+          <CardDescription>Pega un JWT para decodificarlo. No se guarda en ningún sitio.</CardDescription>
+          <CardAction className="flex gap-1">
+            <Button variant="ghost" size="icon-sm" aria-label="Copiar token" onClick={() => copy(token, "Token copiado al portapapeles.")} disabled={!token}>
+              <CopyIcon />
+            </Button>
+            <Button variant="ghost" size="icon-sm" aria-label="Limpiar token" onClick={() => setToken("")} disabled={!token}>
+              <EraserIcon />
+            </Button>
+          </CardAction>
+        </CardHeader>
+        <CardContent>
+          <CodeEditor
+            value={token}
+            onChange={setToken}
+            language="none"
+            placeholder="eyJhbGciOi..."
+            aria-label="Token JWT"
+            className="min-h-56 bg-muted/40 lg:min-h-80"
+            extensions={[jwtHighlightPlugin]}
+            basicSetup={EDITOR_SETUP}
+          />
+        </CardContent>
+        <CardFooter className="flex-wrap gap-2">
+          {decoded.status === "error" && (
+            <Badge variant="destructive">
+              <ShieldAlertIcon data-icon="inline-start" />
+              JWT inválido
+            </Badge>
+          )}
+          {decoded.status === "ok" && (
+            <Badge variant="secondary">
+              <CheckCircle2Icon data-icon="inline-start" />
+              Formato válido · {alg || "sin alg"}
+            </Badge>
+          )}
+          {signature === "valid" && (
+            <Badge variant="secondary">
+              <ShieldCheckIcon data-icon="inline-start" />
+              Firma verificada
+            </Badge>
+          )}
+          {signature === "invalid" && (
+            <Badge variant="destructive">
+              <ShieldAlertIcon data-icon="inline-start" />
+              Firma inválida
+            </Badge>
+          )}
+          {payload && typeof payload.exp === "number" && (
+            <Badge variant={payload.exp < now ? "destructive" : "outline"}>
+              <ClockIcon data-icon="inline-start" />
+              {payload.exp < now ? "Expirado" : "Vigente"}
+            </Badge>
+          )}
+        </CardFooter>
+      </Card>
+
+      <div className="flex min-w-0 flex-col gap-4">
+        {decoded.status === "error" && (
+          <Alert variant="destructive">
+            <TriangleAlertIcon />
+            <AlertTitle>No se pudo decodificar</AlertTitle>
+            <AlertDescription className="break-words">{decoded.message}</AlertDescription>
+          </Alert>
+        )}
+
+        <JsonCard
+          title="Header"
+          description="Algoritmo y tipo de token"
+          value={decoded.status === "ok" ? JSON.stringify(decoded.header, null, 2) : ""}
+        />
+        <JsonCard
+          title="Payload"
+          description="Claims del token"
+          value={payload ? JSON.stringify(payload, null, 2) : ""}
+          footer={payload && <ClaimDates payload={payload} />}
+        />
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Verificar firma</CardTitle>
+            <CardDescription>Clave HMAC con la que se firmó el token (HS256, HS384 o HS512).</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <Input
+              type="password"
+              autoComplete="off"
+              aria-label="Clave secreta"
+              value={secret}
+              onChange={(e) => setSecret(e.target.value)}
+              placeholder="your-256-bit-secret"
+              className="font-mono"
+            />
+            <Field orientation="horizontal">
+              <Switch id="jwt-b64-secret" checked={isBase64Url} onCheckedChange={setIsBase64Url} />
+              <FieldLabel htmlFor="jwt-b64-secret">La clave está en Base64URL</FieldLabel>
+            </Field>
+            {signature === "unsupported" && (
+              <FieldDescription>
+                Este token usa {alg || "un algoritmo desconocido"}: solo se pueden verificar firmas HMAC.
+              </FieldDescription>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
+
+function Encoder() {
+  const copy = useCopy()
+  const [header, setHeader] = useToolState(TOOL, "enc-header", DEFAULT_HEADER, SECRET)
+  const [payload, setPayload] = useToolState(TOOL, "enc-payload", DEFAULT_PAYLOAD, SECRET)
+  const [secret, setSecret] = useToolState(TOOL, "enc-secret", "your-256-bit-secret", SECRET)
+  const [isBase64Url, setIsBase64Url] = useToolState(TOOL, "enc-b64url", false, { parse: parsers.boolean() })
+  const [signed, setSigned] = React.useState<{ token: string; error: string | null }>({ token: "", error: null })
+
+  const parsed = React.useMemo(() => {
+    const parseObject = (text: string, label: string) => {
+      try {
+        const value: unknown = JSON.parse(text)
+        if (value === null || typeof value !== "object" || Array.isArray(value)) {
+          return { error: `El ${label} debe ser un objeto JSON.` }
+        }
+        return { value: value as Record<string, unknown> }
+      } catch {
+        return { error: `El ${label} no es JSON válido.` }
+      }
+    }
+    return { header: parseObject(header, "header"), payload: parseObject(payload, "payload") }
+  }, [header, payload])
+
+  React.useEffect(() => {
+    const h = parsed.header.value
+    const p = parsed.payload.value
+    if (!h || !p) {
+      setSigned({ token: "", error: null })
+      return
+    }
+    if (typeof h.alg !== "string" || !HMAC_ALGORITHMS.includes(h.alg)) {
+      setSigned({ token: "", error: 'El header debe incluir "alg": "HS256", "HS384" o "HS512".' })
+      return
+    }
+    let cancelled = false
+    const sign = async () => {
+      try {
+        const token = await new SignJWT(p)
+          .setProtectedHeader(h as { alg: string })
+          .sign(secretToKey(secret, isBase64Url))
+        if (!cancelled) setSigned({ token, error: null })
+      } catch (error) {
+        if (!cancelled) {
+          setSigned({ token: "", error: error instanceof Error ? error.message : "No se pudo firmar el token." })
+        }
+      }
+    }
+    sign()
+    return () => {
+      cancelled = true
+    }
+  }, [parsed, secret, isBase64Url])
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <div className="flex min-w-0 flex-col gap-4">
+        <JsonCard title="Header" description="Algoritmo y tipo de token" value={header} onChange={setHeader} error={parsed.header.error} />
+        <JsonCard title="Payload" description="Claims del token" value={payload} onChange={setPayload} error={parsed.payload.error} />
+        <Card>
+          <CardHeader>
+            <CardTitle>Clave de firma</CardTitle>
+            <CardDescription>Se usa solo en este navegador y no se guarda.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <Input
+              type="password"
+              autoComplete="off"
+              aria-label="Clave de firma"
+              value={secret}
+              onChange={(e) => setSecret(e.target.value)}
+              placeholder="your-256-bit-secret"
+              className="font-mono"
+            />
+            <Field orientation="horizontal">
+              <Switch id="jwt-enc-b64-secret" checked={isBase64Url} onCheckedChange={setIsBase64Url} />
+              <FieldLabel htmlFor="jwt-enc-b64-secret">La clave está en Base64URL</FieldLabel>
+            </Field>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="lg:self-start">
+        <CardHeader>
+          <CardTitle>Token firmado</CardTitle>
+          <CardDescription>Se actualiza al editar header, payload o clave.</CardDescription>
+          <CardAction>
+            <Button variant="ghost" size="icon-sm" aria-label="Copiar token" onClick={() => copy(signed.token, "Token copiado al portapapeles.")} disabled={!signed.token}>
+              <CopyIcon />
+            </Button>
+          </CardAction>
+        </CardHeader>
+        <CardContent>
+          {signed.error ? (
+            <Alert variant="destructive">
+              <TriangleAlertIcon />
+              <AlertTitle>No se pudo firmar</AlertTitle>
+              <AlertDescription className="break-words">{signed.error}</AlertDescription>
+            </Alert>
+          ) : (
+            <CodeEditor
+              value={signed.token}
+              readOnly
+              language="none"
+              aria-label="Token firmado"
+              className="min-h-56 bg-muted/40 lg:min-h-80"
+              extensions={[jwtHighlightPlugin]}
+              basicSetup={EDITOR_SETUP}
+            />
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function JsonCard({
+  title,
+  description,
+  value,
+  onChange,
+  error,
+  footer,
+}: {
+  title: string
+  description: string
+  value: string
+  onChange?: (value: string) => void
+  error?: string
+  footer?: React.ReactNode
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+        {onChange && (
+          <CardAction>
+            {error ? (
+              <Badge variant="destructive">JSON inválido</Badge>
+            ) : (
+              <Badge variant="secondary">JSON válido</Badge>
+            )}
+          </CardAction>
+        )}
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <CodeEditor
+          value={value}
+          onChange={onChange}
+          readOnly={!onChange}
+          aria-label={title}
+          className="bg-muted/40"
+          basicSetup={{ foldGutter: false }}
+        />
+        {error && <p className="text-sm text-destructive">{error}</p>}
+      </CardContent>
+      {footer}
+    </Card>
+  )
+}
+
+function ClaimDates({ payload }: { payload: Record<string, unknown> }) {
+  const claims = [
+    { key: "iat", label: "Emitido" },
+    { key: "nbf", label: "Válido desde" },
+    { key: "exp", label: "Expira" },
+  ].filter((claim) => typeof payload[claim.key] === "number")
+
+  if (claims.length === 0) return null
+
+  return (
+    <CardFooter className="flex-col items-stretch gap-1.5 border-t">
+      {claims.map((claim) => (
+        <div key={claim.key} className="flex items-center justify-between gap-4 text-xs">
+          <span className="text-muted-foreground">
+            {claim.label} <span className="font-mono">({claim.key})</span>
+          </span>
+          <span className="font-mono tabular-nums">{formatDate(payload[claim.key] as number)}</span>
+        </div>
+      ))}
+    </CardFooter>
   )
 }
