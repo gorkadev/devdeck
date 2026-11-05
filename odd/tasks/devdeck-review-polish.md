@@ -1,0 +1,23 @@
+# DevDeck review + persistence + premium shell
+
+Objective: review every tool (code + UI on mobile/desktop), make URL params safe, persist work in localStorage (never secrets), and give the sidebar/home a more premium shadcn look.
+Branch: `feat/review-persistence-polish` · Delivery: ask-on-risk · Test runner: none in repo (verified with `pnpm typecheck`, `pnpm lint`, `pnpm build` and browser probes at 390px and 1440px).
+
+## Specs
+
+- S1 Review each tool, code and UI: "vete herramienta por herramienta revisando tanto el codigo, como la ui, mediante capturas o lo q necesites, para verificar q tanto en mobile como en desktop, siempre se vean bien las vistas."
+- S2 URL parameters: "tener en cuenta que se pueda parametrizar mediante la url las distintas herramientas, de modo seguro siempre." Acceptance: malformed or out-of-range params never crash nor freeze a tool; secrets are never written to the URL.
+- S3 Persistence: "es un espacio pensado para q el usuario vuelva y encuentre algo q hizo o tenia a medias, sin necesidad de iniciar sesion, por lo q tiramos de localstorage lo q se pueda (con cabeza, no infinito, pero q no sea q sales de la pagina vuelves y no tienes nada, q se guarde tu ultima busqueda etc cosas asi, obvio en herramientas de seguridad entiendo q no)". Acceptance: bounded storage; security tools (JWT, Bcrypt, Hash input) persist options only.
+- S4 Shell polish: "revisa la sidebar y la vista principal. debemos de darle una mejor sensacion premium, es demasiado basica ahora mismo. no añadimos cosas muy custom ni extrañas, mantenemos linea de diseño de shadcn. simplemente rellenamos la ui para q no sea tan sosa."
+
+## Tasks
+
+- [x] T1 [S2,S3] `useToolState` (validated URL + bounded localStorage) replacing `useURLSync`; migrate all tools; strip legacy secret params — inline — commit 1
+- [x] T2 [S1] Per-tool correctness fixes (JWT verify/expiry and races, bcrypt stale results, base64 derived state, bounds) — inline — commit 1
+- [x] T3 [S1,S4] Shell: sidebar active state + mobile close + footer, header with breadcrumb/search/theme, home with recents, shared tool header, mobile layout fixes — inline — commit 2 (+ route code splitting, commit 3)
+
+## Log
+
+- L1 (2026-11-05) User request (verbatim): "necesito q revises el codigo de esta app. vete herramienta por herramienta revisando tanto el codigo, como la ui, mediante capturas o lo q necesites, para verificar q tanto en mobile como en desktop, siempre se vean bien las vistas. revision de las dos cosas: codigo + ui. tener en cuenta que se pueda parametrizar mediante la url las distintas herramientas, de modo seguro siempre. es un espacio pensado para q el usuario vuelva y encuentre algo q hizo o tenia a medias, sin necesidad de iniciar sesion, por lo q tiramos de localstorage lo q se pueda (con cabeza, no infinito, pero q no sea q sales de la pagina vuelves y no tienes nada, q se guarde tu ultima busqueda etc cosas asi, obvio en herramientas de seguridad entiendo q no) despues, revisa la sidebar y la vista principal. debemos de darle una mejor sensacion premium, es demasiado basica ahora mismo. no añadimos cosas muy custom ni extrañas, mantenemos linea de diseño de shadcn. simplemente rellenamos la ui para q no sea tan sosa. usa la skill y mcp de shadcn, asi como todas las skills de ui q estan en mi pc, como las de emil o similares"
+- L2 Baseline evidence: `/json-formatter?input=123` crashes ("rawInput.trim is not a function"); URL params unvalidated (`qty`, `iterations`, `rounds`, `indent`); JWT `token`/`secret`/`enc-secret` and bcrypt passwords written to the URL; sidebar has no active state; no horizontal overflow at 390px.
+- L3 Verification (browser, dev server): `?input=123&indent=abc` renders and is sanitized to `?input="123"`; `?qty=99999999&version=v9` → 1 UUID v4; `?iterations=1e9` dropped; `?rounds=31` → 10; JWT `secret`/`token`/`enc-secret` stripped from URL on load; HS256 demo secret verifies, wrong secret shows "Firma inválida"; localStorage only holds json-formatter input/indent and recent-tools after using JWT/Bcrypt; JSON input + indent restored after leaving and returning; 390px: no horizontal overflow on any route, mobile sheet closes on navigation; light and dark checked. `pnpm lint`, `tsc -b --force`, `pnpm build` pass. Entry chunk 1.44 MB → 262 KB with autoCodeSplitting. No unit test runner in the repo (test-first exception; not adding a dependency without asking).
