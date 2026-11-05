@@ -1,11 +1,10 @@
 import { Link, useRouterState } from "@tanstack/react-router"
-import { CodeIcon, SearchIcon, ShieldCheckIcon } from "lucide-react"
+import { CodeIcon, SearchIcon } from "lucide-react"
 
 import { SearchShortcut, useOpenCommandPalette } from "@/components/layout/command-palette"
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -28,8 +27,8 @@ export function AppSidebar() {
   }
 
   return (
-    <Sidebar variant="inset">
-      <SidebarHeader className="gap-3">
+    <Sidebar variant="floating">
+      <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" render={<Link to="/" onClick={closeOnMobile} />}>
@@ -46,18 +45,23 @@ export function AppSidebar() {
           </SidebarMenuItem>
         </SidebarMenu>
 
-        <button
-          type="button"
-          onClick={() => {
-            closeOnMobile()
-            openCommandPalette()
-          }}
-          className="flex h-9 w-full items-center gap-2 rounded-lg border bg-background px-3 text-sm text-muted-foreground shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-        >
-          <SearchIcon className="size-4" />
-          <span className="flex-1 text-left">Buscar...</span>
-          <SearchShortcut />
-        </button>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              className="text-muted-foreground"
+              onClick={() => {
+                closeOnMobile()
+                openCommandPalette()
+              }}
+            >
+              <SearchIcon />
+              <span>Buscar</span>
+              <span className="ml-auto">
+                <SearchShortcut />
+              </span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarHeader>
 
       <SidebarContent>
@@ -82,18 +86,6 @@ export function AppSidebar() {
           </SidebarGroup>
         ))}
       </SidebarContent>
-
-      <SidebarFooter>
-        <div className="flex items-start gap-3 rounded-lg border bg-background p-3 shadow-xs">
-          <ShieldCheckIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-          <div className="flex flex-col gap-0.5">
-            <span className="text-xs font-medium">100% en tu navegador</span>
-            <span className="text-xs text-muted-foreground">
-              Nada se envía a ningún servidor. Tu progreso se guarda en este dispositivo.
-            </span>
-          </div>
-        </div>
-      </SidebarFooter>
     </Sidebar>
   )
 }

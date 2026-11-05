@@ -67,7 +67,7 @@ function AppHeader() {
   return (
     <header className="sticky top-0 z-10 flex h-(--header-height) shrink-0 items-center gap-2 rounded-t-[inherit] border-b bg-background/80 px-4 backdrop-blur-md">
       <SidebarTrigger className="-ml-1" />
-      <Separator orientation="vertical" className="mr-1 data-[orientation=vertical]:h-4" />
+      <Separator orientation="vertical" className="mr-1 data-vertical:h-4 data-vertical:self-center" />
       <Breadcrumb className="min-w-0 flex-1">
         <BreadcrumbList className="flex-nowrap">
           {tool ? (
