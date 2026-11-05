@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch"
 import { CodeEditor } from "@/components/shared/code-editor"
 import { jwtHighlightPlugin } from "@/components/shared/jwt-highlight-plugin"
 import { useCopy } from "@/hooks/use-copy"
+import { useURLSync } from "@/hooks/use-url-sync"
 
 // Token de ejemplo por defecto (firmado con "your-256-bit-secret" para que la
 // verificación de firma funcione al cargar la página)
@@ -18,9 +19,9 @@ const DEFAULT_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3
 
 export function JwtDecoderPage() {
   const copy = useCopy()
-  const [token, setToken] = React.useState(DEFAULT_TOKEN)
-  const [secret, setSecret] = React.useState("")
-  const [isBase64Url, setIsBase64Url] = React.useState(false)
+  const [token, setToken] = useURLSync<string>("token", DEFAULT_TOKEN)
+  const [secret, setSecret] = useURLSync<string>("secret", "")
+  const [isBase64Url, setIsBase64Url] = useURLSync<boolean>("b64url", false)
 
   // Decoded state
   const [header, setHeader] = React.useState<unknown>(null)
@@ -31,10 +32,10 @@ export function JwtDecoderPage() {
   const [isValidSignature, setIsValidSignature] = React.useState<boolean | null>(null)
 
   // Encoder state
-  const [encoderHeader, setEncoderHeader] = React.useState('{\n  "alg": "HS256",\n  "typ": "JWT"\n}')
-  const [encoderPayload, setEncoderPayload] = React.useState('{\n  "sub": "1234567890",\n  "name": "John Doe",\n  "iat": 1516239022\n}')
-  const [encoderSecret, setEncoderSecret] = React.useState("your-256-bit-secret")
-  const [isEncoderBase64Url, setIsEncoderBase64Url] = React.useState(false)
+  const [encoderHeader, setEncoderHeader] = useURLSync<string>("enc-header", '{\n  "alg": "HS256",\n  "typ": "JWT"\n}')
+  const [encoderPayload, setEncoderPayload] = useURLSync<string>("enc-payload", '{\n  "sub": "1234567890",\n  "name": "John Doe",\n  "iat": 1516239022\n}')
+  const [encoderSecret, setEncoderSecret] = useURLSync<string>("enc-secret", "your-256-bit-secret")
+  const [isEncoderBase64Url, setIsEncoderBase64Url] = useURLSync<boolean>("enc-b64url", false)
   const [generatedToken, setGeneratedToken] = React.useState("")
   const [encoderHeaderError, setEncoderHeaderError] = React.useState<string | null>(null)
   const [encoderPayloadError, setEncoderPayloadError] = React.useState<string | null>(null)

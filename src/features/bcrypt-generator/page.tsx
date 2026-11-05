@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Slider } from "@/components/ui/slider"
 import { useCopy } from "@/hooks/use-copy"
+import { useURLSync } from "@/hooks/use-url-sync"
 
 // Helper para obtener el texto dinámico y color según rondas
 function getSecurityInfo(rounds: number) {
@@ -27,17 +28,17 @@ function getSecurityInfo(rounds: number) {
 
 export function BcryptGeneratorPage() {
   const copy = useCopy()
+  const [genText, setGenText] = useURLSync<string>("text", "")
+  const [rounds, setRounds] = useURLSync<number>("rounds", 10)
+  const [verHash, setVerHash] = useURLSync<string>("verhash", "")
+  const [verText, setVerText] = useURLSync<string>("vertext", "")
 
   // Generation State
-  const [genText, setGenText] = React.useState("")
-  const [rounds, setRounds] = React.useState(10) // Slider value is an array
   const [isGenerating, setIsGenerating] = React.useState(false)
   const [generatedHash, setGeneratedHash] = React.useState("")
   const [generatedCost, setGeneratedCost] = React.useState(0)
 
   // Verification State
-  const [verHash, setVerHash] = React.useState("")
-  const [verText, setVerText] = React.useState("")
   const [isVerifying, setIsVerifying] = React.useState(false)
   const [verifyResult, setVerifyResult] = React.useState<"success" | "error" | null>(null)
 

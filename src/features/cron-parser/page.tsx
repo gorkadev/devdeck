@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useCopy } from "@/hooks/use-copy"
+import { useURLSync } from "@/hooks/use-url-sync"
 
 const PRESETS = [
   { label: "* * * * *", desc: "Cada minuto" },
@@ -21,8 +22,8 @@ const PRESETS = [
 
 export function CronParserPage() {
   const copy = useCopy()
-  const [expression, setExpression] = React.useState("*/15 * * * *")
-  const [iterations, setIterations] = React.useState<number>(5)
+  const [expression, setExpression] = useURLSync<string>("expr", "*/15 * * * *")
+  const [iterations, setIterations] = useURLSync<number>("iterations", 5)
 
   // Desglose visual
   const parts = expression.trim().split(/\s+/)
