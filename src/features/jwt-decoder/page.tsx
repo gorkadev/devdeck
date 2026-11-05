@@ -112,7 +112,10 @@ function Decoder() {
       return
     }
     let cancelled = false
-    compactVerify(token.trim(), secretToKey(secret, isBase64Url), { algorithms: [alg] })
+    // Build the key inside the chain: a malformed Base64URL secret throws, and
+    // that must surface as "invalid", not escape the effect and crash the page.
+    Promise.resolve()
+      .then(() => compactVerify(token.trim(), secretToKey(secret, isBase64Url), { algorithms: [alg] }))
       .then(() => !cancelled && setSignature("valid"))
       .catch(() => !cancelled && setSignature("invalid"))
     return () => {
